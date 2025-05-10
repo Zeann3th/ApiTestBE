@@ -8,7 +8,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { BullModule } from '@nestjs/bullmq';
 import { EndpointModule } from './endpoint/endpoint.module';
 import { FlowModule } from './flow/flow.module';
-import { QueueModule } from 'src/queue/queue.module';
+import { QueueModule } from 'src/modules/queue/queue.module';
 
 @Module({
   imports: [
@@ -38,7 +38,7 @@ import { QueueModule } from 'src/queue/queue.module';
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
-    }
+    },
   ]
 })
 export class AppModule {

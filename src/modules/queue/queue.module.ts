@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import { Consumer } from './queue.consumer';
 import { BullModule } from '@nestjs/bullmq';
+import { QueueService } from './queue.service';
+import { DrizzleModule } from 'src/database/drizzle.module';
 
 @Module({
     imports: [
@@ -12,12 +14,13 @@ import { BullModule } from '@nestjs/bullmq';
                 attempts: 3,
                 backoff: {
                     type: 'exponential',
-                    delay: 1000,
+                    delay: 2000,
                 },
             },
-        })
+        }),
+        DrizzleModule
     ],
-    providers: [Consumer],
+    providers: [Consumer, QueueService],
     exports: [BullModule],
 })
 export class QueueModule { }
