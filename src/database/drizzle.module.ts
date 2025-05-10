@@ -14,7 +14,7 @@ export const DRIZZLE = Symbol("Drizzle Connection");
         const url = env.DATABASE_URL;
         const authToken = env.DATABASE_AUTH_TOKEN;
 
-        const turso = await createClient({
+        const turso = createClient({
           url,
           authToken,
         })

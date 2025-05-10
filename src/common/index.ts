@@ -13,7 +13,8 @@ const schema = z.object({
   JWT_VERIFY_SECRET: z.string({ required_error: "VERIFY_SECRET is required" }),
   JWT_REFRESH_SECRET: z.string({ required_error: "REFRESH_SECRET is required" }),
 
-  CACHE_URL: z.string({ required_error: "CACHE_URL is required" }),
+  REDIS_HOST: z.string({ required_error: "REDIS_HOST is required" }),
+  REDIS_PORT: z.coerce.number({ required_error: "REDIS_PORT is required" }),
 
   SMTP_HOST: z.string({ required_error: "SMTP_HOST is required" }),
   SMTP_EMAIL: z.string({ required_error: "SMTP_EMAIL is required" })

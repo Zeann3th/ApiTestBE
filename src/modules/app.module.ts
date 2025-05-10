@@ -4,17 +4,19 @@ import { AuthModule } from './auth/auth.module';
 import { ConfigModule } from '@nestjs/config';
 import { HealthcheckModule } from './healthcheck/healthcheck.module';
 import { ScheduleModule } from '@nestjs/schedule';
-import { RedisModule } from '@nestjs-modules/ioredis';
 import { minutes, ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
+import { BullModule } from '@nestjs/bullmq';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     ScheduleModule.forRoot(),
-    RedisModule.forRoot({
-      type: "single",
-      url: env.CACHE_URL
+    BullModule.forRoot({
+      connection: {
+        host: env.REDIS_HOST,
+        port: env.REDIS_PORT
+      }
     }),
     ThrottlerModule.forRoot({
       throttlers: [
