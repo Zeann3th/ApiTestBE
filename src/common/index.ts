@@ -15,6 +15,7 @@ const schema = z.object({
 
   REDIS_HOST: z.string({ required_error: "REDIS_HOST is required" }),
   REDIS_PORT: z.coerce.number({ required_error: "REDIS_PORT is required" }),
+  REDIS_PASSWORD: z.string({ required_error: "REDIS_PASSWORD is required" }),
 
   SMTP_HOST: z.string({ required_error: "SMTP_HOST is required" }),
   SMTP_EMAIL: z.string({ required_error: "SMTP_EMAIL is required" })

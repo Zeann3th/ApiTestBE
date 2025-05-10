@@ -7,6 +7,8 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { minutes, ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 import { BullModule } from '@nestjs/bullmq';
+import { EndpointModule } from './endpoint/endpoint.module';
+import { FlowModule } from './flow/flow.module';
 
 @Module({
   imports: [
@@ -15,8 +17,9 @@ import { BullModule } from '@nestjs/bullmq';
     BullModule.forRoot({
       connection: {
         host: env.REDIS_HOST,
-        port: env.REDIS_PORT
-      }
+        port: env.REDIS_PORT,
+        password: env.REDIS_PASSWORD,
+      },
     }),
     ThrottlerModule.forRoot({
       throttlers: [
@@ -28,12 +31,14 @@ import { BullModule } from '@nestjs/bullmq';
     }),
     HealthcheckModule,
     AuthModule,
+    EndpointModule,
+    FlowModule,
   ],
   providers: [
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
-    }
+    },
   ]
 })
 export class AppModule {
