@@ -1,15 +1,11 @@
 import { Module } from '@nestjs/common';
 import { FlowController } from './flow.controller';
 import { FlowService } from './flow.service';
-import { BullModule } from '@nestjs/bullmq';
+import { QueueModule } from 'src/queue/queue.module';
 
 @Module({
   controllers: [FlowController],
   providers: [FlowService],
-  imports: [
-    BullModule.registerQueue({
-      name: 'flow'
-    })
-  ]
+  imports: [QueueModule],
 })
 export class FlowModule { }

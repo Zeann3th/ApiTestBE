@@ -1,15 +1,11 @@
 import { Module } from '@nestjs/common';
 import { EndpointController } from './endpoint.controller';
 import { EndpointService } from './endpoint.service';
-import { BullModule } from '@nestjs/bullmq';
+import { QueueModule } from 'src/queue/queue.module';
 
 @Module({
   controllers: [EndpointController],
   providers: [EndpointService],
-  imports: [
-    BullModule.registerQueue({
-      name: 'endpoint'
-    })
-  ],
+  imports: [QueueModule],
 })
 export class EndpointModule { }
