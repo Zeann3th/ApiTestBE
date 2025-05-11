@@ -6,7 +6,6 @@ import env from 'src/common';
 export class MailService {
   private readonly logger: Logger = new Logger(MailService.name);
   private readonly transporter: nodemailer.Transporter;
-  private readonly css = `<style>body{font-family:Arial,sans-serif;background-color:#f4f4f4;margin:0;padding:0;display:flex;justify-content:center;align-items:center;min-height:100vh}.container{background:#fff;padding:40px;border-radius:12px;box-shadow:0 4px 12px rgba(0,0,0,0.1);text-align:center}h1{color:#333}p{font-size:18px;color:#555}.pin{font-size:32px;font-weight:bold;letter-spacing:4px;background:#eee;display:inline-block;padding:10px 20px;border-radius:8px;margin:20px 0}</style>`;
 
   constructor() {
     this.transporter = nodemailer.createTransport({
@@ -19,13 +18,29 @@ export class MailService {
       }
     });
   }
-  async sendVerifyEmail(addr: string, token: string) {
+  async sendVerifyEmail(name: string, addr: string, token: string) {
     try {
       const mail = await this.transporter.sendMail({
         from: `"The Parking Hub" <${process.env.SMTP_SENDER}>`,
         to: `${addr}`,
         subject: "Confirm your email",
-        html: `<a href="${env.APP_URL}/auth/verify-email?token=${token}"></a>`,
+        html: `<!DOCTYPE html>
+                  <html>
+                    <body style="font-family: Arial, sans-serif; color: #333;">
+                      <h2>Welcome to Postman! 🎉</h2>
+                      <p>Hi ${name},</p>
+
+                      <p>Thanks for signing up! Click the button below to verify your email and activate your account:</p>
+                      <p style="text-align: center;">
+                        <a href="${env.APP_URL}/auth/verify-email?token=${token}"></a>" style="background-color: #16578f; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 6px;">Verify Email</a>
+                      </p>
+
+                      <p>If you didn’t sign up for Postman, you can safely ignore this email.</p>
+
+                      <hr />
+                      <small>This link will expire in 15 minutes.</small>
+                    </body>
+                  </html>`,
       });
 
       this.logger.log("Verify message %s sent to: %s", mail.messageId, addr);
@@ -34,13 +49,29 @@ export class MailService {
     }
   }
 
-  async sendResetPasswordEmail(addr: string, token: string) {
+  async sendResetPasswordEmail(name: string, addr: string, token: string) {
     try {
       const mail = await this.transporter.sendMail({
         from: `"The Parking Hub" <${process.env.SMTP_SENDER}>`,
         to: `${addr}`,
         subject: "Password Reset Request",
-        html: `<a href="${env.APP_URL}/auth/reset-password?token=${token}"></a>`
+        html: `<!DOCTYPE html>
+                <html>
+                  <body style="font-family: Arial, sans-serif; color: #333;">
+                    <h2>Password Reset Request 🔐</h2>
+                    <p>Hi ${name},</p>
+                    <p>We received a request to reset your password. Click the button below to set a new one:</p>
+
+                    <p style="text-align: center;">
+                      <a href="${env.APP_URL}/auth/reset-password?token=${token}" style="background-color: #49a75d; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 6px;">Reset Password</a>
+                    </p>
+
+                    <p>If you didn’t request a password reset, just ignore this email—your current password will still work.</p>
+
+                    <hr />
+                    <small>This link will expire in 15 minutes.</small>
+                  </body>
+                </html>`,
       });
 
       this.logger.log("Recovery message %s sent to: %s", mail.messageId, addr);

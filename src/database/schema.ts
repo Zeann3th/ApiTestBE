@@ -1,4 +1,4 @@
-import { index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { index, integer, primaryKey, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
 export const users = sqliteTable("users_29d9a827", {
   id: text("id").primaryKey().$default(() => crypto.randomUUID()),
@@ -67,4 +67,15 @@ export const flowSteps = sqliteTable("flow_steps", {
   createdAt: text("created_at").$default(() => new Date().toISOString()).notNull(),
   updatedAt: text("updated_at").$default(() => new Date().toISOString()).notNull(),
 });
+
+// Blasphemous variable store, only needed when running entirely on backend
+export const variables = sqliteTable("variables", {
+  projectId: text("project_id").references(() => projects.id, { onDelete: "cascade" }).notNull(),
+  name: text("name").notNull(),
+  value: text("value").notNull(),
+  createdAt: text("created_at").$default(() => new Date().toISOString()).notNull(),
+  updatedAt: text("updated_at").$default(() => new Date().toISOString()).notNull(),
+}, (table) => [
+  primaryKey({ columns: [table.projectId, table.name], name: "project_variables_pk" }),
+]);
 

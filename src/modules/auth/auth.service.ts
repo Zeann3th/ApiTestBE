@@ -29,7 +29,7 @@ export class AuthService {
       const verifyToken = this.createToken(payload, 'verify');
       const refreshToken = this.createToken(payload, 'refresh');
 
-      this.mailService.sendVerifyEmail(email, verifyToken);
+      this.mailService.sendVerifyEmail(user.name, email, verifyToken);
 
       await this.db.update(users)
         .set({ refreshToken })
@@ -117,7 +117,7 @@ export class AuthService {
     const verifyToken = this.createToken({ sub: user.id, username: user.username, email: user.email }, 'verify');
 
     try {
-      await this.mailService.sendResetPasswordEmail(email, verifyToken);
+      await this.mailService.sendResetPasswordEmail(user.name, email, verifyToken);
     } catch (e) {
       throw new HttpException("Failed to send email", 500);
     }
@@ -196,9 +196,9 @@ export class AuthService {
 
     try {
       if (action === 'verify') {
-        await this.mailService.sendVerifyEmail(email, verifyToken);
+        await this.mailService.sendVerifyEmail(user.name, email, verifyToken);
       } else if (action === 'reset') {
-        await this.mailService.sendResetPasswordEmail(email, verifyToken);
+        await this.mailService.sendResetPasswordEmail(user.name, email, verifyToken);
       }
     } catch (e) {
       throw new HttpException("Failed to send email", 500);

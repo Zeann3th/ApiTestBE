@@ -9,6 +9,7 @@ import { BullModule } from '@nestjs/bullmq';
 import { EndpointModule } from './endpoint/endpoint.module';
 import { FlowModule } from './flow/flow.module';
 import { QueueModule } from 'src/modules/queue/queue.module';
+import { ProjectModule } from './project/project.module';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { QueueModule } from 'src/modules/queue/queue.module';
     EndpointModule,
     FlowModule,
     QueueModule,
+    ProjectModule,
   ],
   providers: [
     {
