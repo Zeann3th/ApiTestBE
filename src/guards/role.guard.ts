@@ -19,7 +19,7 @@ export class RoleGuard implements CanActivate {
         const request = context.switchToHttp().getRequest();
 
         const user: UserInterface = request.user;
-        const projectId = String(request.params.projectId ?? request.query.projectId);
+        const projectId = String(request.params.projectId);
 
         if (!projectId || projectId.trim() === '') {
             throw new ForbiddenException('Missing projectId in route');

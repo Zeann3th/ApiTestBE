@@ -1,4 +1,4 @@
-import { Body, Controller, DefaultValuePipe, Delete, Get, HttpCode, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, DefaultValuePipe, Delete, Get, HttpCode, Param, ParseUUIDPipe, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ProjectService } from './project.service';
 import { JwtAuthGuard } from 'src/guards/jwt.guard';
 import { ApiBearerAuth, ApiBody, ApiOperation, ApiParam, ApiQuery } from '@nestjs/swagger';
@@ -8,12 +8,12 @@ import { RoleGuard } from 'src/guards/role.guard';
 
 @Controller('projects')
 @UseGuards(JwtAuthGuard)
+@ApiBearerAuth()
 export class ProjectController {
     constructor(private readonly projectService: ProjectService) { }
 
     @ApiOperation({ summary: 'Get all projects' })
     @Get()
-    @ApiBearerAuth()
     @ApiQuery({ name: 'page', required: false, type: Number })
     @ApiQuery({ name: 'limit', required: false, type: Number })
     async getAll(
@@ -26,16 +26,14 @@ export class ProjectController {
 
     @ApiOperation({ summary: 'Get project by ID' })
     @UseGuards(RoleGuard)
-    @Get(':projectId')
-    @ApiBearerAuth()
+    @Post(':projectId')
     @ApiParam({ name: 'projectId', required: true, type: String })
-    async getById(@Param('projectId') id: string) {
+    async getById(@Param('projectId', new ParseUUIDPipe()) id: string) {
         return await this.projectService.getById(id);
     }
 
     @ApiOperation({ summary: 'Create a new project' })
-    @Post()
-    @ApiBearerAuth()
+    @Post('create')
     @ApiBody({
         description: 'Project data',
         schema: {
@@ -50,23 +48,23 @@ export class ProjectController {
     }
 
     @Post(':projectId/members')
-    async addMember(@User() user: UserInterface, @Param('projectId') id: string, @Body() body: { userId: string; role: string }) {
+    async addMember(@User() user: UserInterface, @Param('projectId', new ParseUUIDPipe()) id: string, @Body() body: { userId: string; role: string }) {
 
     }
 
     @Patch(':projectId')
-    async update(@Param('projectId') id: string, @Body() body: { name?: string; description?: string }) {
+    async update(@Param('projectId', new ParseUUIDPipe()) id: string, @Body() body: { name?: string; description?: string }) {
         return await this.projectService.update(id, body);
     }
 
     @Delete(':projectId/members/:userId')
-    async removeMember(@User() user: UserInterface, @Param('projectId') id: string, @Param('userId') userId: string) {
+    async removeMember(@User() user: UserInterface, @Param('projectId', new ParseUUIDPipe()) id: string, @Param('userId', new ParseUUIDPipe()) userId: string) {
 
     }
 
     @Delete(':projectId')
     @HttpCode(204)
-    async delete(@Param('projectId') id: string) {
+    async delete(@Param('projectId', new ParseUUIDPipe()) id: string) {
         return await this.projectService.delete(id);
     }
 }
