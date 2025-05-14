@@ -9,7 +9,7 @@ import {
 export class FileValidationPipe implements PipeTransform {
     constructor(
         private allowedMimeTypes: string[] = ["application/json", "application/xml"],
-        private maxSizeInBytes: number = 20 * 1024 * 1024,
+        private maxSizeInBytes: number = Infinity,
     ) { }
 
     transform(file: Express.Multer.File, metadata: ArgumentMetadata) {

@@ -22,6 +22,20 @@
       "when": 1747193347777,
       "tag": "0002_brown_gamora",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1747199178500,
+      "tag": "0003_special_edwin_jarvis",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1747205568887,
+      "tag": "0004_organic_nightmare",
+      "breakpoints": true
     }
   ]
 }
