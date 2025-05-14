@@ -1,11 +1,13 @@
 import { Module } from '@nestjs/common';
 import { EndpointController } from './endpoint.controller';
 import { EndpointService } from './endpoint.service';
-import { QueueModule } from 'src/modules/queue/queue.module';
+import { DrizzleModule } from 'src/database/drizzle.module';
+import { PassportModule } from '@nestjs/passport';
+import { JwtStrategy } from 'src/strategies/jwt.strategy';
 
 @Module({
   controllers: [EndpointController],
-  providers: [EndpointService],
-  imports: [QueueModule],
+  providers: [EndpointService, JwtStrategy],
+  imports: [DrizzleModule, PassportModule],
 })
 export class EndpointModule { }

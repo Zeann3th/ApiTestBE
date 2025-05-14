@@ -1,35 +1,29 @@
 import { HttpException, Inject, Injectable } from '@nestjs/common';
 import { DRIZZLE } from 'src/database/drizzle.module';
 import { DrizzleDB } from 'src/database/types/drizzle';
-import { LoginUserDto, RegisterUserDto } from './dto/auth.dto';
+import { LoginUserDto, RegisterUserDto } from './auth.dto';
 import * as bcrypt from 'bcrypt';
 import { users } from 'src/database/schema';
 import { eq } from 'drizzle-orm';
 import { JwtService } from '@nestjs/jwt';
 import env from 'src/common';
-import { MailService } from './mail.service';
-import { ResetUserPasswordDto, VerifyUserEmailDto } from './dto/verify-user.dto';
 
 @Injectable()
 export class AuthService {
   constructor(
     @Inject(DRIZZLE) private db: DrizzleDB,
-    private readonly mailService: MailService,
     private readonly jwtService: JwtService,
   ) { }
 
-  async register({ username, email, password, name }: RegisterUserDto) {
+  async register({ username, email, password }: RegisterUserDto) {
     password = await bcrypt.hash(password, 10);
     try {
-      const user = await this.db.insert(users).values({ username, email, password, name }).returning().get();
+      const user = await this.db.insert(users).values({ username, password, email }).returning().get();
 
       const payload = { sub: user.id, username: user.username, email: user.email };
 
       const accessToken = this.createToken(payload, 'access');
-      const verifyToken = this.createToken(payload, 'verify');
       const refreshToken = this.createToken(payload, 'refresh');
-
-      this.mailService.sendVerifyEmail(user.name, email, verifyToken);
 
       await this.db.update(users)
         .set({ refreshToken })
@@ -106,114 +100,7 @@ export class AuthService {
     }
   }
 
-  async forgotPassword(email: string) {
-    if (!email) throw new HttpException("Email is required", 400);
-
-    const [user] = await this.db.select().from(users)
-      .where(eq(users.email, email));
-
-    if (!user) throw new HttpException("User not found", 404);
-
-    const verifyToken = this.createToken({ sub: user.id, username: user.username, email: user.email }, 'verify');
-
-    try {
-      await this.mailService.sendResetPasswordEmail(user.name, email, verifyToken);
-    } catch (e) {
-      throw new HttpException("Failed to send email", 500);
-    }
-
-    return { message: "Password reset email sent" };
-  }
-
-  async resetPassword({ password, token }: ResetUserPasswordDto) {
-    try {
-      const decoded = this.jwtService.verify(token, { secret: env.JWT_VERIFY_SECRET });
-      const email = decoded.email;
-
-      if (!email) throw new HttpException("Invalid token", 403);
-
-      const [user] = await this.db.select().from(users)
-        .where(eq(users.email, email));
-
-      if (!user) throw new HttpException("User not found", 404);
-
-      const hashedPassword = await bcrypt.hash(password, 10);
-
-      await this.db.update(users)
-        .set({ password: hashedPassword })
-        .where(eq(users.email, email));
-
-      return { message: "Password reset successfully" };
-    } catch (e) {
-      if (e.name === 'TokenExpiredError') {
-        throw new HttpException("Token expired", 401);
-      }
-      if (e.name === 'JsonWebTokenError') {
-        throw new HttpException("Invalid token", 403);
-      }
-      throw new HttpException("Failed to reset password", 500);
-    }
-  }
-
-  async verifyEmail({ token }: VerifyUserEmailDto) {
-    try {
-      const decoded = this.jwtService.verify(token, { secret: env.JWT_VERIFY_SECRET });
-      const email = decoded.email;
-
-      if (!email) throw new HttpException("Invalid token", 403);
-
-      const [user] = await this.db.select().from(users)
-        .where(eq(users.email, email));
-
-      if (!user) throw new HttpException("User not found", 404);
-
-      await this.db.update(users)
-        .set({ isVerified: 1 })
-        .where(eq(users.email, email));
-
-      return { message: "Email verified successfully" };
-    } catch (e) {
-      if (e.name === 'TokenExpiredError') {
-        throw new HttpException("Token expired", 401);
-      }
-      if (e.name === 'JsonWebTokenError') {
-        throw new HttpException("Invalid token", 403);
-      }
-      throw new HttpException("Failed to verify email", 500);
-    }
-  }
-
-  async resendEmail(email: string, action: string) {
-    if (!email || !action) throw new HttpException("Email and action are required", 400);
-    if (action !== 'verify' && action !== 'reset') throw new HttpException("Invalid action", 400);
-
-    const [user] = await this.db.select().from(users)
-      .where(eq(users.email, email));
-
-    if (!user) throw new HttpException("User not found", 404);
-
-    const verifyToken = this.createToken({ sub: user.id, username: user.username, email: user.email }, 'verify');
-
-    try {
-      if (action === 'verify') {
-        await this.mailService.sendVerifyEmail(user.name, email, verifyToken);
-      } else if (action === 'reset') {
-        await this.mailService.sendResetPasswordEmail(user.name, email, verifyToken);
-      }
-    } catch (e) {
-      throw new HttpException("Failed to send email", 500);
-    }
-
-    return { message: "Email sent successfully" };
-  }
-
   private createToken(payload: object, type: string): string {
-    if (type === 'verify') {
-      return this.jwtService.sign(payload, {
-        secret: env.JWT_VERIFY_SECRET,
-        expiresIn: "10m"
-      });
-    }
     if (type === 'access') {
       return this.jwtService.sign(payload, {
         secret: env.JWT_ACCESS_SECRET,

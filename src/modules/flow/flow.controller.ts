@@ -1,7 +1,10 @@
 import { Controller, Delete, Get, Patch, Post } from '@nestjs/common';
 import { FlowService } from './flow.service';
+import { ApiBearerAuth, ApiParam } from '@nestjs/swagger';
 
-@Controller('flows')
+@Controller('/projects/:projectId/flows')
+@ApiBearerAuth()
+@ApiParam({ name: 'projectId', required: true, description: 'Project ID' })
 export class FlowController {
     constructor(private readonly flowService: FlowService) { }
 

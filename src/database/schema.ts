@@ -3,9 +3,7 @@ import { index, integer, primaryKey, sqliteTable, text } from "drizzle-orm/sqlit
 export const users = sqliteTable("users_29d9a827", {
   id: text("id").primaryKey().$default(() => crypto.randomUUID()),
   username: text().unique().notNull(),
-  name: text().notNull().$default(() => "User_" + crypto.randomUUID().substring(0, 5)),
   email: text().unique().notNull(),
-  isVerified: integer("is_verified").$default(() => 0).notNull(),
   password: text().notNull(),
   refreshToken: text("refresh_token"),
   createdAt: text("created_at").$default(() => new Date().toISOString()).notNull(),
@@ -38,8 +36,7 @@ export const endpoints = sqliteTable("endpoints", {
   url: text("url").notNull(),
   headers: text("headers", { mode: "json" }),
   body: text("body", { mode: "json" }),
-  pathParams: text("params", { mode: "json" }),
-  queryParams: text("query", { mode: "json" }),
+  parameters: text("query", { mode: "json" }),
   preProcessors: text("pre_processors", { mode: "json" }),
   postProcessors: text("post_processors", { mode: "json" }),
   createdAt: text("created_at").$default(() => new Date().toISOString()).notNull(),
@@ -68,7 +65,6 @@ export const flowSteps = sqliteTable("flow_steps", {
   updatedAt: text("updated_at").$default(() => new Date().toISOString()).notNull(),
 });
 
-// Blasphemous variable store, only needed when running entirely on backend
 export const variables = sqliteTable("variables", {
   projectId: text("project_id").references(() => projects.id, { onDelete: "cascade" }).notNull(),
   name: text("name").notNull(),

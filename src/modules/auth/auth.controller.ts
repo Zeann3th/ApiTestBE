@@ -1,11 +1,9 @@
 import { Body, Controller, Get, HttpCode, Post, Req, Res } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { LoginUserDto, RegisterUserDto } from './dto/auth.dto';
+import { LoginUserDto, RegisterUserDto } from './auth.dto';
 import { ApiBody, ApiCookieAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Request, Response } from 'express';
 import env from 'src/common';
-import { ResetUserPasswordDto, VerifyUserEmailDto } from './dto/verify-user.dto';
-import { Throttle } from '@nestjs/throttler';
 
 @ApiTags("Authentication")
 @Controller('auth')
@@ -19,7 +17,6 @@ export class AuthController {
       type: "object",
       properties: {
         username: { type: "string", example: "username" },
-        name: { type: "string", example: "name" },
         password: { type: "string", example: "password" },
         email: { type: "string", example: "email" },
       },
@@ -102,88 +99,5 @@ export class AuthController {
       partitioned: env.NODE_ENV === "production",
     });
     return response.status(204).send();
-  }
-
-  @ApiOperation({ summary: "Send forgot password request and mail" })
-  @ApiBody({
-    schema: {
-      type: "object",
-      properties: {
-        email: { type: "string", example: "email" }
-      },
-      required: ["email"]
-    }
-  })
-  @ApiResponse({ status: 200, description: "Success" })
-  @ApiResponse({ status: 400, description: "Email is required" })
-  @ApiResponse({ status: 404, description: "User not found" })
-  @Throttle({ default: { limit: 3, ttl: 60 } })
-  @HttpCode(200)
-  @Post('forgot-password')
-  async forgotPassword(@Body("email") email: string) {
-    return await this.authService.forgotPassword(email);
-  }
-
-  @ApiOperation({ summary: "Reset user password" })
-  @ApiBody({
-    schema: {
-      type: "object",
-      properties: {
-        email: { type: "string", example: "email" },
-        password: { type: "string", example: "password" },
-        pin: { type: "string", example: "token" }
-      },
-      required: ["email", "password", "pin"]
-    }
-  })
-  @ApiResponse({ status: 200, description: "Success" })
-  @ApiResponse({ status: 403, description: "Invalid or expired token" })
-  @ApiResponse({ status: 404, description: "User not found" })
-  @HttpCode(200)
-  @Post('reset-password')
-  async resetPassword(@Body() body: ResetUserPasswordDto) {
-    return await this.authService.resetPassword(body);
-  }
-
-  @ApiOperation({ summary: "Verify user email" })
-  @ApiBody({
-    schema: {
-      type: "object",
-      properties: {
-        email: { type: "string", example: "email" },
-        pin: { type: "string", example: "token" }
-      },
-      required: ["email", "pin"]
-    }
-  })
-  @ApiResponse({ status: 200, description: "Success" })
-  @ApiResponse({ status: 403, description: "Invalid or expired token" })
-  @ApiResponse({ status: 404, description: "User not found" })
-  @HttpCode(200)
-  @Post("verify-email")
-  async verifyEmail(@Body() body: VerifyUserEmailDto) {
-    return await this.authService.verifyEmail(body);
-  }
-
-  @ApiOperation({ summary: "Resend email verification" })
-  @ApiBody({
-    schema: {
-      type: "object",
-      properties: {
-        email: { type: "string", example: "email" },
-        action: { type: "string", example: "action" }
-      },
-      required: ["email", "action"]
-    }
-  })
-  @ApiResponse({ status: 200, description: "Success" })
-  @ApiResponse({ status: 400, description: "Email and action are required" })
-  @ApiResponse({ status: 404, description: "User not found" })
-  @ApiResponse({ status: 400, description: "Invalid action" })
-  @Throttle({ default: { limit: 3, ttl: 60 } })
-  @HttpCode(200)
-  @Post("resend-email")
-  async resendEmail(@Body("email") email: string, @Body("action") action: string) {
-    return await this.authService.resendEmail(email, action);
   }
 }
