@@ -3,10 +3,10 @@ export interface Endpoint {
     description: string;
     method: "GET" | "POST" | "PUT" | "DELETE" | "PATCH" | "OPTIONS" | "HEAD";
     url: string;
-    headers: Record<string, string>;
-    body: Record<string, any>;
-    parameters: Record<string, any>;
-    preProcessors?: Record<string, string>;
+    headers?: Record<string, string>;
+    body?: Record<string, any>;
+    parameters?: Record<string, any>;
+    preProcessors?: Record<string, string[] | string>;
     postProcessors?: Record<string, string>;
 }
 

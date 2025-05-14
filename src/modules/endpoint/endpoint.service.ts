@@ -1,5 +1,4 @@
 import { HttpException, Inject, Injectable } from '@nestjs/common';
-import { dereference, parse } from '@readme/openapi-parser';
 import { and, count, eq, sql } from 'drizzle-orm';
 import { DRIZZLE } from 'src/database/drizzle.module';
 import { endpoints } from 'src/database/schema';
