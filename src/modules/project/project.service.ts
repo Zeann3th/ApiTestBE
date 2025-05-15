@@ -37,11 +37,6 @@ export class ProjectService {
       .select()
       .from(projects)
       .where(eq(projects.id, id));
-
-    if (!project) {
-      throw new HttpException('Project not found', 404);
-    }
-
     return project;
   }
 
@@ -61,28 +56,10 @@ export class ProjectService {
 
 
   async update(id: string, body: UpdateProjectDto) {
-    const [project] = await this.db
-      .select()
-      .from(projects)
-      .where(eq(projects.id, id));
-
-    if (!project) {
-      throw new HttpException('Project not found', 404);
-    }
-
     return await this.db.update(projects).set(body).where(eq(projects.id, id)).returning().get();
   }
 
   async delete(id: string) {
-    const [project] = await this.db
-      .select()
-      .from(projects)
-      .where(eq(projects.id, id));
-
-    if (!project) {
-      throw new HttpException('Project not found', 404);
-    }
-
     await this.db.delete(projects).where(eq(projects.id, id));
     return {};
   }
