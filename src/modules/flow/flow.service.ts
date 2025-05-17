@@ -8,7 +8,7 @@ import { UpdateFlowDto } from './dto/update-flow.dto';
 import { RunFlowDto } from './dto/run-flow.dto';
 import { Worker } from 'worker_threads';
 import { FlowProcessorDto } from './dto/flow-processor.dto';
-import path from 'path';
+import * as path from 'path';
 
 @Injectable()
 export class FlowService {
@@ -149,26 +149,32 @@ export class FlowService {
       throw new HttpException(`Flow ${id} does not exist`, 404);
     }
 
-    const sharedBuffer = new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT * 3);
-    const sharedView = new Int32Array(sharedBuffer);
-    // sharedView[0] = requestCount;
-    // sharedView[1] = errorCount;
-    // sharedView[2] = totalLatency;
+    try {
+      const sharedBuffer = new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT * 3);
+      const sharedView = new Int32Array(sharedBuffer);
+      // sharedView[0] = requestCount;
+      // sharedView[1] = errorCount;
+      // sharedView[2] = totalLatency;
 
-    const perThread = Math.ceil(ccu / threads);
+      const perThread = Math.ceil(ccu / threads);
 
-    for (let i = 1; i <= threads; i++) {
-      const assignedCCU = i === threads - 1
-        ? ccu - perThread * i
-        : perThread;
-      const worker = new Worker("./src/modules/flow/flow.worker.js", { workerData: { id, ccu: assignedCCU, duration, sharedBuffer } });
+      for (let i = 1; i <= threads; i++) {
+        const assignedCCU = i === threads - 1
+          ? ccu - perThread * i
+          : perThread;
 
-      worker.on("message", (message) => {
-        if (message.type === "log") {
-          console.log(message.message);
-        }
-      });
+        const worker = new Worker(path.join(__dirname, 'flow.worker.js'), { workerData: { id: i, ccu: assignedCCU, duration, sharedBuffer } });
+
+        worker.on("message", (message) => {
+          if (message.type === "log") {
+            console.log(message.message);
+          }
+        });
+      }
+      return { message: "Flow started successfully" };
+    } catch (error) {
+      console.error(error);
+      throw new HttpException("Internal Server Error", 500);
     }
-    return { message: "Flow started successfully" };
   }
 }

@@ -1,9 +1,10 @@
-import { Module } from "@nestjs/common";
+import { Logger, Module } from "@nestjs/common";
 import { drizzle, LibSQLDatabase } from "drizzle-orm/libsql";
 import env from "src/common";
 import * as schema from "./schema";
 import { createClient } from "@libsql/client";
 import { migrate } from "drizzle-orm/libsql/migrator";
+import * as path from "path";
 
 export const DRIZZLE = Symbol("Drizzle Connection");
 
@@ -12,6 +13,7 @@ export const DRIZZLE = Symbol("Drizzle Connection");
     {
       provide: DRIZZLE,
       useFactory: async () => {
+        const logger = new Logger("DatabaseMigrator")
         const client = createClient({
           url: env.DATABASE_URL,
         });
@@ -19,9 +21,11 @@ export const DRIZZLE = Symbol("Drizzle Connection");
         const db = drizzle(client, { schema }) as LibSQLDatabase<typeof schema>;
 
         try {
-          await migrate(db, { migrationsFolder: "migrations" });
+          logger.log(__dirname);
+          await migrate(db, { migrationsFolder: path.join(__dirname, "..", "..", "migrations") });
+          logger.log("Database migrated successfully");
         } catch (error) {
-          console.log("Tables have already been created");
+          logger.log("Database tables already exist");
         }
 
         return db;
