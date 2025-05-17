@@ -9,12 +9,10 @@ import { ApiSpecParserFactory } from './parser';
 export class EndpointService {
   constructor(@Inject(DRIZZLE) private readonly db: DrizzleDB) { }
 
-  async getAll(projectId: string, page: number, limit: number) {
+  async getAll(page: number, limit: number) {
     const [[{ total }], endpointList] = await Promise.all([
-      this.db.select({ total: count() }).from(endpoints)
-        .where(eq(endpoints.projectId, projectId)),
+      this.db.select({ total: count() }).from(endpoints),
       this.db.select().from(endpoints)
-        .where(eq(endpoints.projectId, projectId))
         .limit(limit)
         .offset((page - 1) * limit)
     ]);
@@ -26,14 +24,11 @@ export class EndpointService {
 
   }
 
-  async getById(projectId: string, id: string) {
+  async getById(id: string) {
     const [endpoint] = await this.db
       .select()
       .from(endpoints)
-      .where(and(
-        eq(endpoints.projectId, projectId),
-        eq(endpoints.id, id)
-      ));
+      .where(eq(endpoints.id, id));
 
     if (!endpoint) {
       throw new HttpException('Endpoint not found', 404);
@@ -42,11 +37,9 @@ export class EndpointService {
     return endpoint;
   }
 
-  async upload(projectId: string, file: Express.Multer.File) {
+  async upload(file: Express.Multer.File) {
     try {
-      const parser = ApiSpecParserFactory.createParser(file.mimetype);
-      const endpointList = parser.parse(file.buffer.toString());
-      const data = endpointList.map((endpoint) => ({ ...endpoint, projectId }))
+      const data = ApiSpecParserFactory.createParser(file.mimetype).parse(file.buffer.toString());
       const req = await this.db.insert(endpoints).values(data).onConflictDoUpdate({
         target: [endpoints.method, endpoints.url],
         set: {
@@ -69,6 +62,6 @@ export class EndpointService {
     }
   }
 
-  async update(projectId: string, id: string, body: any) {
+  async update(id: string, body: any) {
   }
 }
