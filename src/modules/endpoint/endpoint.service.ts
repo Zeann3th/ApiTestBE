@@ -21,7 +21,6 @@ export class EndpointService {
       total,
       data: endpointList
     }
-
   }
 
   async getById(id: string) {
@@ -50,8 +49,6 @@ export class EndpointService {
           headers: sql`excluded.headers`,
           body: sql`excluded.body`,
           parameters: sql`excluded.parameters`,
-          preProcessors: sql`excluded.pre_processors`,
-          postProcessors: sql`excluded.post_processors`,
           updatedAt: new Date().toISOString()
         }
       });

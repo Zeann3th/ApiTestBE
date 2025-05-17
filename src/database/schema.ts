@@ -1,4 +1,4 @@
-import { integer, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { integer, real, sqliteTable, text, unique } from "drizzle-orm/sqlite-core";
 
 export const endpoints = sqliteTable("endpoints", {
   id: text("id").primaryKey().$default(() => crypto.randomUUID()),
@@ -9,12 +9,10 @@ export const endpoints = sqliteTable("endpoints", {
   headers: text("headers", { mode: "json" }),
   body: text("body", { mode: "json" }),
   parameters: text("parameters", { mode: "json" }),
-  preProcessors: text("pre_processors", { mode: "json" }),
-  postProcessors: text("post_processors", { mode: "json" }),
   createdAt: text("created_at").$default(() => new Date().toISOString()).notNull(),
   updatedAt: text("updated_at").$default(() => new Date().toISOString()).notNull(),
 }, (table) => [
-  uniqueIndex("project_endpoints_path_idx").on(table.method, table.url)
+  unique("endpoints_path_idx").on(table.method, table.url)
 ]);
 
 export const flows = sqliteTable("flows", {
@@ -27,16 +25,19 @@ export const flows = sqliteTable("flows", {
 
 export const flowSteps = sqliteTable("flow_steps", {
   id: text("id").primaryKey().$default(() => crypto.randomUUID()),
-  flowId: text("flow_id").references(() => flows.id).notNull(),
-  endpointId: text("endpoint_id").references(() => endpoints.id).notNull(),
-  order: integer("order").notNull(),
+  flowId: text("flow_id").references(() => flows.id, { onDelete: "cascade" }).notNull(),
+  endpointId: text("endpoint_id").references(() => endpoints.id, { onDelete: "set null" }).notNull(),
+  postProcessor: text("post_processor", { mode: "json" }),
+  sequence: integer("sequence").notNull(),
   createdAt: text("created_at").$default(() => new Date().toISOString()).notNull(),
   updatedAt: text("updated_at").$default(() => new Date().toISOString()).notNull(),
-});
+}, (table) => [
+  unique("flow_steps_sequence_idx").on(table.flowId, table.sequence),
+]);
 
 export const flowRuns = sqliteTable("flow_runs", {
   id: text("id").primaryKey().$default(() => crypto.randomUUID()),
-  flowId: text("flow_id").references(() => flows.id).notNull(),
+  flowId: text("flow_id").references(() => flows.id, { onDelete: "cascade" }).notNull(),
   status: text("status", { enum: ["PENDING", "RUNNING", "COMPLETED", "FAILED"] }).$default(() => "PENDING").notNull(),
   latency: real("latency"),
   successRate: real("success_rate").$default(() => 0).notNull(),
@@ -47,11 +48,3 @@ export const flowRuns = sqliteTable("flow_runs", {
   completedAt: text("completed_at"),
   note: text("note"),
 });
-
-export const variables = sqliteTable("variables", {
-  name: text("name").primaryKey(),
-  value: text("value").notNull(),
-  createdAt: text("created_at").$default(() => new Date().toISOString()).notNull(),
-  updatedAt: text("updated_at").$default(() => new Date().toISOString()).notNull(),
-});
-

@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "8bc3333d-4e02-404e-b8f7-505b9211014f",
+  "id": "1a12cb93-f942-426a-9bf8-f321407342b4",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "endpoints": {
@@ -63,20 +63,6 @@
           "notNull": false,
           "autoincrement": false
         },
-        "pre_processors": {
-          "name": "pre_processors",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "post_processors": {
-          "name": "post_processors",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
         "created_at": {
           "name": "created_at",
           "type": "text",
@@ -93,8 +79,8 @@
         }
       },
       "indexes": {
-        "project_endpoints_path_idx": {
-          "name": "project_endpoints_path_idx",
+        "endpoints_path_idx": {
+          "name": "endpoints_path_idx",
           "columns": [
             "method",
             "url"
@@ -200,7 +186,7 @@
           "columnsTo": [
             "id"
           ],
-          "onDelete": "no action",
+          "onDelete": "cascade",
           "onUpdate": "no action"
         }
       },
@@ -232,8 +218,15 @@
           "notNull": true,
           "autoincrement": false
         },
-        "order": {
-          "name": "order",
+        "post_processor": {
+          "name": "post_processor",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "sequence": {
+          "name": "sequence",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
@@ -254,7 +247,16 @@
           "autoincrement": false
         }
       },
-      "indexes": {},
+      "indexes": {
+        "flow_steps_sequence_idx": {
+          "name": "flow_steps_sequence_idx",
+          "columns": [
+            "flow_id",
+            "sequence"
+          ],
+          "isUnique": true
+        }
+      },
       "foreignKeys": {
         "flow_steps_flow_id_flows_id_fk": {
           "name": "flow_steps_flow_id_flows_id_fk",
@@ -266,7 +268,7 @@
           "columnsTo": [
             "id"
           ],
-          "onDelete": "no action",
+          "onDelete": "cascade",
           "onUpdate": "no action"
         },
         "flow_steps_endpoint_id_endpoints_id_fk": {
@@ -279,7 +281,7 @@
           "columnsTo": [
             "id"
           ],
-          "onDelete": "no action",
+          "onDelete": "set null",
           "onUpdate": "no action"
         }
       },
@@ -309,44 +311,6 @@
           "type": "text",
           "primaryKey": false,
           "notNull": false,
-          "autoincrement": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
-    "variables": {
-      "name": "variables",
-      "columns": {
-        "name": {
-          "name": "name",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "value": {
-          "name": "value",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
           "autoincrement": false
         },
         "created_at": {
