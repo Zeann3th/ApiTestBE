@@ -1,6 +1,6 @@
 import { HttpException, Inject, Injectable } from '@nestjs/common';
 import { DRIZZLE } from 'src/database/drizzle.module';
-import { DrizzleDB } from 'src/database/types/drizzle';
+import { DrizzleDB } from 'src/types/drizzle';
 import { CreateFlowDto } from './dto/create-flow.dto';
 import { flows, flowSteps } from 'src/database/schema';
 import { and, asc, count, eq } from 'drizzle-orm';
@@ -9,6 +9,8 @@ import { RunFlowDto } from './dto/run-flow.dto';
 import { Worker } from 'worker_threads';
 import { FlowProcessorDto } from './dto/flow-processor.dto';
 import * as path from 'path';
+import * as os from 'os';
+import { copyFile } from 'fs/promises';
 
 @Injectable()
 export class FlowService {
@@ -163,7 +165,8 @@ export class FlowService {
           ? ccu - perThread * i
           : perThread;
 
-        const worker = new Worker(path.join(__dirname, 'flow.worker.js'), { workerData: { id: i, ccu: assignedCCU, duration, sharedBuffer } });
+        const workerPath = await this.resolvePath();
+        const worker = new Worker(workerPath, { workerData: { id: i, ccu: assignedCCU, duration, sharedBuffer } });
 
         worker.on("message", (message) => {
           if (message.type === "log") {
@@ -176,5 +179,17 @@ export class FlowService {
       console.error(error);
       throw new HttpException("Internal Server Error", 500);
     }
+  }
+
+  private async resolvePath() {
+    const relativePath = path.join(__dirname, 'flow.worker.js');
+
+    if (typeof process.pkg !== 'undefined') {
+      const tmpPath = path.join(os.tmpdir(), 'flow.worker.js');
+      await copyFile(relativePath, tmpPath);
+      return tmpPath;
+    }
+
+    return relativePath;
   }
 }

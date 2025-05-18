@@ -2,7 +2,7 @@ import { HttpException, Inject, Injectable } from '@nestjs/common';
 import { and, count, eq, sql } from 'drizzle-orm';
 import { DRIZZLE } from 'src/database/drizzle.module';
 import { endpoints } from 'src/database/schema';
-import { DrizzleDB } from 'src/database/types/drizzle';
+import { DrizzleDB } from 'src/types/drizzle';
 import { ApiSpecParserFactory } from './parser';
 
 @Injectable()
