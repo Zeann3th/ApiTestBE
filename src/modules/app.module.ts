@@ -5,6 +5,8 @@ import { minutes, ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 import { EndpointModule } from './endpoint/endpoint.module';
 import { FlowModule } from './flow/flow.module';
+import { ParserModule } from './parser/parser.module';
+import { RunnerModule } from './runner/runner.module';
 
 @Module({
   imports: [
@@ -20,6 +22,8 @@ import { FlowModule } from './flow/flow.module';
     HealthcheckModule,
     EndpointModule,
     FlowModule,
+    ParserModule,
+    RunnerModule,
   ],
   providers: [
     {

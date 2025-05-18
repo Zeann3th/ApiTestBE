@@ -2,12 +2,15 @@ import { HttpException, Inject, Injectable } from '@nestjs/common';
 import { and, count, eq, sql } from 'drizzle-orm';
 import { DRIZZLE } from 'src/database/drizzle.module';
 import { endpoints } from 'src/database/schema';
-import { DrizzleDB } from 'src/types/drizzle';
-import { ApiSpecParserFactory } from './parser';
+import { DrizzleDB } from 'src/common/types/drizzle';
+import { ParserService } from '../parser/parser.service';
 
 @Injectable()
 export class EndpointService {
-  constructor(@Inject(DRIZZLE) private readonly db: DrizzleDB) { }
+  constructor(
+    @Inject(DRIZZLE) private readonly db: DrizzleDB,
+    private readonly parserService: ParserService
+  ) { }
 
   async getAll(page: number, limit: number) {
     const [[{ total }], endpointList] = await Promise.all([
@@ -38,7 +41,7 @@ export class EndpointService {
 
   async upload(file: Express.Multer.File) {
     try {
-      const data = ApiSpecParserFactory.createParser(file.mimetype).parse(file.buffer.toString());
+      const data = this.parserService.createParser(file.mimetype).parse(file.buffer.toString());
       const req = await this.db.insert(endpoints).values(data).onConflictDoUpdate({
         target: [endpoints.method, endpoints.url],
         set: {

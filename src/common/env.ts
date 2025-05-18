@@ -1,6 +1,4 @@
 import "dotenv/config";
-import { homedir, platform } from "node:os";
-import { join } from "node:path";
 import { z } from "zod";
 
 const schema = z.object({

@@ -59,8 +59,7 @@
     "scripts": "./dist/src/main.js",
     "assets": [
       "node_modules/**/*",
-      "dist/migrations/**/*",
-      "dist/src/**/*"
+      "dist/migrations/**/*"
     ],
     "targets": [
       "node22-win-x64",

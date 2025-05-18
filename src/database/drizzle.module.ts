@@ -1,6 +1,6 @@
 import { Logger, Module } from "@nestjs/common";
 import { drizzle, LibSQLDatabase } from "drizzle-orm/libsql";
-import env from "src/common";
+import env from "src/common/env";
 import * as schema from "./schema";
 import { createClient } from "@libsql/client";
 import { migrate } from "drizzle-orm/libsql/migrator";

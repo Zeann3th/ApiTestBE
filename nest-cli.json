@@ -9,11 +9,6 @@
         "include": "../migrations/**/*",
         "outDir": "dist/migrations",
         "watchAssets": true
-      },
-      {
-        "include": "./modules/**/*.js",
-        "outDir": "dist/src",
-        "watchAssets": true
       }
     ]
   }

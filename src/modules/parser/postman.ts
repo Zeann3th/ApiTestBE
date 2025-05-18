@@ -1,5 +1,8 @@
-import { ApiSpecParser, Endpoint, PostmanSpec } from "./types";
+import { Injectable } from "@nestjs/common";
+import { ApiSpecParser, PostmanSpec } from "./parser.types";
+import { Endpoint } from "src/common/types";
 
+@Injectable()
 export class PostmanParser implements ApiSpecParser {
     parse(spec: string): Endpoint[] {
         try {

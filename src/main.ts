@@ -1,4 +1,4 @@
-import env from './common';
+import env from './common/env';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './modules/app.module';
 import { Logger, ValidationPipe } from '@nestjs/common';

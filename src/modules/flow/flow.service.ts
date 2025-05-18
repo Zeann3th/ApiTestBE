@@ -1,16 +1,17 @@
 import { HttpException, Inject, Injectable } from '@nestjs/common';
 import { DRIZZLE } from 'src/database/drizzle.module';
-import { DrizzleDB } from 'src/types/drizzle';
+import { DrizzleDB } from 'src/common/types/drizzle';
 import { CreateFlowDto } from './dto/create-flow.dto';
-import { flows, flowSteps } from 'src/database/schema';
+import { endpoints, flowRuns, flows, flowSteps } from 'src/database/schema';
 import { and, asc, count, eq } from 'drizzle-orm';
 import { UpdateFlowDto } from './dto/update-flow.dto';
 import { RunFlowDto } from './dto/run-flow.dto';
-import { Worker } from 'worker_threads';
+import { Worker, workerData } from 'worker_threads';
 import { FlowProcessorDto } from './dto/flow-processor.dto';
 import * as path from 'path';
 import * as os from 'os';
 import { copyFile } from 'fs/promises';
+import { WorkerData } from 'src/common/types';
 
 @Injectable()
 export class FlowService {
@@ -70,11 +71,7 @@ export class FlowService {
   }
 
   async update(id: string, { name, description, sequence }: UpdateFlowDto) {
-    const [flow] = await this.db.select()
-      .from(flows).where(eq(flows.id, id));
-    if (!flow) {
-      throw new HttpException(`Flow ${id} does not exist`, 404);
-    }
+    await this.getById(id);
 
     if (name || description) {
       await this.db.update(flows)
@@ -105,11 +102,7 @@ export class FlowService {
   }
 
   async delete(id: string) {
-    const [flow] = await this.db.select()
-      .from(flows).where(eq(flows.id, id));
-    if (!flow) {
-      throw new HttpException(`Flow ${id} does not exist`, 404);
-    }
+    await this.getById(id);
 
     await this.db.delete(flows)
       .where(eq(flows.id, id));
@@ -117,11 +110,7 @@ export class FlowService {
   }
 
   async updateProcessor(id: string, { sequence, postProcessor }: FlowProcessorDto) {
-    const [flow] = await this.db.select()
-      .from(flows).where(eq(flows.id, id));
-    if (!flow) {
-      throw new HttpException(`Flow ${id} does not exist`, 404);
-    }
+    await this.getById(id);
 
     const [step] = await this.db.select()
       .from(flowSteps)
@@ -144,37 +133,58 @@ export class FlowService {
     return { message: "Flow updated successfully" };
   }
 
-  async run(id: string, { ccu, threads, duration }: RunFlowDto) {
-    const [flow] = await this.db.select()
-      .from(flows).where(eq(flows.id, id));
-    if (!flow) {
-      throw new HttpException(`Flow ${id} does not exist`, 404);
-    }
+  async run(id: string, { ccu, threads, duration, input }: RunFlowDto) {
+    await this.getById(id);
+
+    const steps = await this.db.select().from(flowSteps)
+      .where(eq(flowSteps.flowId, id))
+      .leftJoin(endpoints, eq(flowSteps.endpointId, endpoints.id))
+      .orderBy(flowSteps.sequence)
 
     try {
-      const sharedBuffer = new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT * 3);
-      const sharedView = new Int32Array(sharedBuffer);
-      // sharedView[0] = requestCount;
-      // sharedView[1] = errorCount;
-      // sharedView[2] = totalLatency;
+      const startedAt = new Date().toISOString();
 
-      const perThread = Math.ceil(ccu / threads);
+      let completed = 0;
+      let totalSuccess = 0;
+      let totalErrors = 0;
+      let totalLatency = 0;
 
       for (let i = 1; i <= threads; i++) {
-        const assignedCCU = i === threads - 1
-          ? ccu - perThread * i
-          : perThread;
-
+        const assignedCCU = i === threads ? ccu - (threads - 1) * Math.ceil(ccu / threads) : Math.ceil(ccu / threads);
         const workerPath = await this.resolvePath();
-        const worker = new Worker(workerPath, { workerData: { id: i, ccu: assignedCCU, duration, sharedBuffer } });
+        const workerData = { id: i, ccu: assignedCCU, duration, steps, input } as WorkerData;
 
-        worker.on("message", (message) => {
-          if (message.type === "log") {
-            console.log(message.message);
+        const worker = new Worker(workerPath, { workerData });
+
+        worker.on('message', (message) => {
+          if (message.type === 'log') {
+            console.log(`Worker ${i}:`, message.message);
+          } else if (message.type === 'result') {
+            totalSuccess += message.successCount;
+            totalErrors += message.errorCount;
+            totalLatency += message.totalLatency;
+          } else if (message.type === 'error') {
+            console.error(`Worker ${i} error:`, message.error);
+          }
+        });
+
+        worker.on('exit', () => {
+          completed++;
+          if (completed === threads) {
+            this.db.insert(flowRuns).values({
+              flowId: id,
+              ccu,
+              threads,
+              throughput: totalSuccess / duration,
+              successRate: totalSuccess > 0 ? (totalSuccess / (totalSuccess + totalErrors)) : 0,
+              latency: totalSuccess > 0 ? totalLatency / totalSuccess : 0,
+              startedAt,
+              completedAt: new Date().toISOString(),
+            });
           }
         });
       }
-      return { message: "Flow started successfully" };
+
     } catch (error) {
       console.error(error);
       throw new HttpException("Internal Server Error", 500);
