@@ -6,7 +6,7 @@ import { endpoints, flowRuns, flows, flowSteps } from 'src/database/schema';
 import { and, asc, count, eq } from 'drizzle-orm';
 import { UpdateFlowDto } from './dto/update-flow.dto';
 import { RunFlowDto } from './dto/run-flow.dto';
-import { Worker, workerData } from 'worker_threads';
+import { Worker } from 'worker_threads';
 import { FlowProcessorDto } from './dto/flow-processor.dto';
 import * as path from 'path';
 import * as os from 'os';
@@ -142,48 +142,40 @@ export class FlowService {
       .orderBy(flowSteps.sequence)
 
     try {
+      const workerPromises: Promise<{ success: number, error: number, latency: number }>[] = [];
       const startedAt = new Date().toISOString();
-
-      let completed = 0;
-      let totalSuccess = 0;
-      let totalErrors = 0;
-      let totalLatency = 0;
 
       for (let i = 1; i <= threads; i++) {
         const assignedCCU = i === threads ? ccu - (threads - 1) * Math.ceil(ccu / threads) : Math.ceil(ccu / threads);
         const workerPath = await this.resolvePath();
         const workerData = { id: i, ccu: assignedCCU, duration, steps, input } as WorkerData;
 
-        const worker = new Worker(workerPath, { workerData });
-
-        worker.on('message', (message) => {
-          if (message.type === 'log') {
-            console.log(`Worker ${i}:`, message.message);
-          } else if (message.type === 'result') {
-            totalSuccess += message.successCount;
-            totalErrors += message.errorCount;
-            totalLatency += message.totalLatency;
-          } else if (message.type === 'error') {
-            console.error(`Worker ${i} error:`, message.error);
-          }
-        });
-
-        worker.on('exit', () => {
-          completed++;
-          if (completed === threads) {
-            this.db.insert(flowRuns).values({
-              flowId: id,
-              ccu,
-              threads,
-              throughput: totalSuccess / duration,
-              successRate: totalSuccess > 0 ? (totalSuccess / (totalSuccess + totalErrors)) : 0,
-              latency: totalSuccess > 0 ? totalLatency / totalSuccess : 0,
-              startedAt,
-              completedAt: new Date().toISOString(),
-            });
-          }
-        });
+        workerPromises.push(this.createWorker(workerPath, workerData));
       }
+
+      const results = await Promise.allSettled(workerPromises);
+      const stats = results.reduce((acc, result) => {
+        if (result.status === 'fulfilled') {
+          acc.success += result.value.success;
+          acc.error += result.value.error;
+          acc.latency += result.value.latency;
+        } else {
+          console.error(`Worker failed: ${result.reason}`);
+        }
+        return acc;
+      }, { success: 0, error: 0, latency: 0 });
+
+      await this.db.insert(flowRuns).values({
+        flowId: id,
+        status: "COMPLETED",
+        ccu,
+        threads,
+        startedAt,
+        completedAt: new Date().toISOString(),
+        successRate: stats.success / (stats.success + stats.error),
+        throughput: stats.success / duration,
+        latency: stats.latency / stats.success
+      });
 
     } catch (error) {
       console.error(error);
@@ -202,4 +194,37 @@ export class FlowService {
 
     return relativePath;
   }
+
+  private async createWorker(workerPath: string, workerData: WorkerData): Promise<{ success: number, error: number, latency: number }> {
+    return new Promise((resolve, reject) => {
+      let success = 0;
+      let error = 0;
+      let latency = 0;
+      const worker = new Worker(workerPath, { workerData });
+
+      worker.on('message', (message) => {
+        if (message.type === 'log') {
+          console.log(`Worker ${workerData.id}:`, message.message);
+        } else if (message.type === 'success') {
+          success += message.success;
+          latency += message.latency;
+        }
+      });
+
+      worker.on('error', (error) => {
+        console.error(`Worker ${workerData.id} error:`, error);
+        reject(error);
+      });
+
+      worker.on('exit', (code) => {
+        if (code !== 0) {
+          console.error(`Worker ${workerData.id} stopped with exit code ${code}`);
+          reject(new Error(`Worker exited with code ${code}`));
+        } else {
+          resolve({ success, error, latency });
+        }
+      });
+    });
+  }
+
 }

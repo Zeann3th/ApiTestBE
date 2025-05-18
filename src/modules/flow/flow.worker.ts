@@ -1,55 +1,55 @@
 import { parentPort, workerData } from 'worker_threads';
-import { RunnerService } from '../runner/runner.service';
 import { WorkerData } from 'src/common/types';
+import { RunnerService } from '../runner/runner.service';
 
 const { ccu, id, duration, steps, input } = workerData as WorkerData;
 
 let stopped = false;
+const endTime = Date.now() + duration * 1000;
+
 setTimeout(() => {
     stopped = true;
     parentPort?.postMessage({ type: 'log', message: `Thread ${id} stopped after ${duration}s` });
 }, duration * 1000);
 
-async function request() {
-    const runner = new RunnerService();
+async function requestLoop() {
+    let success = 0;
+    let error = 0;
+    let latency = 0;
 
-    let successCount = 0;
-    let errorCount = 0;
-    let totalLatency = 0;
+    while (!stopped && Date.now() < endTime) {
+        const promises: Promise<void>[] = [];
 
-    const promises: Promise<void>[] = [];
+        for (let i = 0; i < ccu; i++) {
+            const data = { ...input };
 
-    for (let i = 0; i < ccu; i++) {
-        if (stopped) break;
+            const promise = RunnerService.runFlow(steps, data)
+                .then(result => {
+                    success++;
+                    latency += result.latency || 0;
+                })
+                .catch(err => {
+                    error++;
+                    parentPort?.postMessage({ type: 'log', message: `Thread ${id} error: ${err.message}` });
+                });
 
-        const data = { ...input };
+            promises.push(promise);
+        }
 
-        const promise = runner.runFlow(steps, data)
-            .then(result => {
-                successCount++;
-                totalLatency += result.latency || 0;
-            })
-            .catch(err => {
-                errorCount++;
-                parentPort?.postMessage({ type: 'log', message: `Error in thread ${id}: ${err.message}` });
-            });
-
-        promises.push(promise);
+        await Promise.all(promises);
     }
 
-    await Promise.all(promises);
-
     parentPort?.postMessage({
-        type: 'result',
-        successCount,
-        errorCount,
-        totalLatency,
+        type: 'success',
+        success,
+        error,
+        latency,
     });
 
     process.exit(0);
 }
 
-request().catch(err => {
-    parentPort?.postMessage({ type: 'error', error: err.message });
+requestLoop().catch(err => {
+    parentPort?.postMessage({ type: 'log', message: `Thread ${id} fatal error: ${err.message}` });
     process.exit(1);
 });
