@@ -10,7 +10,7 @@ import { Worker } from 'worker_threads';
 import { FlowProcessorDto } from './dto/flow-processor.dto';
 import * as path from 'path';
 import * as os from 'os';
-import { copyFile } from 'fs/promises';
+import * as fs from 'fs';
 import { WorkerData } from 'src/common/types';
 
 @Injectable()
@@ -184,15 +184,16 @@ export class FlowService {
   }
 
   private async resolvePath() {
-    const relativePath = path.join(__dirname, 'flow.worker.js');
-
     if (typeof process.pkg !== 'undefined') {
-      const tmpPath = path.join(os.tmpdir(), 'flow.worker.js');
-      await copyFile(relativePath, tmpPath);
+      const tmpPath = path.join(os.tmpdir(), `flow.worker.js`);
+
+      const workerCode = fs.readFileSync(path.join(__dirname, 'flow.worker.js'), 'utf8');
+      await fs.promises.writeFile(tmpPath, workerCode, 'utf8');
+
       return tmpPath;
     }
 
-    return relativePath;
+    return path.join(__dirname, 'flow.worker.js');
   }
 
   private async createWorker(workerPath: string, workerData: WorkerData): Promise<{ success: number, error: number, latency: number }> {

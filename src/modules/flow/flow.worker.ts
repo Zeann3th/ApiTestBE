@@ -1,6 +1,7 @@
 import { parentPort, workerData } from 'worker_threads';
 import { WorkerData } from 'src/common/types';
 import { RunnerService } from '../runner/runner.service';
+import pLimit from 'p-limit';
 
 const { ccu, id, duration, steps, input } = workerData as WorkerData;
 
@@ -12,31 +13,37 @@ setTimeout(() => {
     parentPort?.postMessage({ type: 'log', message: `Thread ${id} stopped after ${duration}s` });
 }, duration * 1000);
 
+function delay(ms: number) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 async function requestLoop() {
     let success = 0;
     let error = 0;
     let latency = 0;
+    const limit = pLimit(Math.min(20, ccu));
 
     while (!stopped && Date.now() < endTime) {
         const promises: Promise<void>[] = [];
 
         for (let i = 0; i < ccu; i++) {
-            const data = { ...input };
+            const cloned = { ...input };
 
-            const promise = RunnerService.runFlow(steps, data)
-                .then(result => {
+            promises.push(limit(async () => {
+                const start = performance.now();
+                try {
+                    await RunnerService.runFlow(steps, cloned);
                     success++;
-                    latency += result.latency || 0;
-                })
-                .catch(err => {
+                    latency += performance.now() - start;
+                } catch (err: any) {
                     error++;
                     parentPort?.postMessage({ type: 'log', message: `Thread ${id} error: ${err.message}` });
-                });
-
-            promises.push(promise);
+                }
+            }));
         }
 
-        await Promise.all(promises);
+        await Promise.allSettled(promises);
+        await delay(10);
     }
 
     parentPort?.postMessage({

@@ -1,12 +1,16 @@
 import { Injectable } from '@nestjs/common';
 import axios, { AxiosError } from 'axios';
 import { Endpoint, FlowStep } from 'src/common/types';
+import * as http from 'http';
+import * as https from 'https';
 
 @Injectable()
 export class RunnerService {
     constructor() { }
 
     static async runFlow(steps: FlowStep[], data: Record<string, any> = {}): Promise<Record<string, any>> {
+        const httpAgent = new http.Agent({ keepAlive: true });
+        const httpsAgent = new https.Agent({ keepAlive: true });
         for (const step of steps) {
             const endpoint = step.endpoints as Endpoint;
             if (!endpoint) continue;
@@ -14,7 +18,6 @@ export class RunnerService {
             const request = this.interpolate(endpoint, data);
 
             try {
-                const start = performance.now();
                 const response = await axios({
                     method: request.method,
                     url: request.url,
@@ -24,10 +27,9 @@ export class RunnerService {
                     },
                     params: request.parameters,
                     data: request.body || {},
+                    httpAgent,
+                    httpsAgent,
                 });
-
-                const latency = performance.now() - start;
-                data['latency'] = latency;
 
                 const postProcessors = step.flow_steps?.postProcessor;
                 if (postProcessors?.extract) {
@@ -40,8 +42,7 @@ export class RunnerService {
                 }
             } catch (error) {
                 const err = error as AxiosError;
-                const msg = err?.response?.data || err.message || String(error);
-                throw new Error(`Error in step "${endpoint.name}": ${msg}`);
+                throw new Error(`Error in step "${endpoint.name}": ${err.message}`);
             }
         }
 
