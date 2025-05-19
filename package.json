@@ -6,7 +6,7 @@
   "private": true,
   "license": "MIT",
   "scripts": {
-    "build": "nest build",
+    "build": "nest build -b swc",
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
@@ -54,12 +54,12 @@
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.7.3"
   },
-  "bin": "./dist/main.js",
+  "bin": "./dist/src/main.js",
   "pkg": {
-    "scripts": "./dist/main.js",
+    "scripts": "./dist/src/**/*.js",
     "assets": [
       "node_modules/**/*",
-      "dist/modules/flow/flow.worker.js",
+      "dist/src/modules/flow/flow.worker.js",
       "dist/migrations/**/*"
     ],
     "targets": [
