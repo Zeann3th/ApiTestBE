@@ -1,14 +1,4 @@
-export interface Endpoint {
-    name: string;
-    description: string;
-    method: "GET" | "POST" | "PUT" | "DELETE" | "PATCH" | "OPTIONS" | "HEAD";
-    url: string;
-    headers: Record<string, string>;
-    body: Record<string, any>;
-    parameters: Record<string, any>;
-    preProcessors?: Record<string, string>;
-    postProcessors?: Record<string, string>;
-}
+import { Endpoint } from "src/common/types";
 
 export interface ApiSpecParser {
     parse: (spec: string) => Endpoint[];
