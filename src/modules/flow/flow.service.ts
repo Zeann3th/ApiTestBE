@@ -9,8 +9,6 @@ import { RunFlowDto } from './dto/run-flow.dto';
 import { Worker } from 'worker_threads';
 import { FlowProcessorDto } from './dto/flow-processor.dto';
 import * as path from 'path';
-import * as os from 'os';
-import * as fs from 'fs';
 import { WorkerData } from 'src/common/types';
 
 @Injectable()
@@ -147,10 +145,9 @@ export class FlowService {
 
       for (let i = 1; i <= threads; i++) {
         const assignedCCU = i === threads ? ccu - (threads - 1) * Math.ceil(ccu / threads) : Math.ceil(ccu / threads);
-        const workerPath = await this.resolvePath();
         const workerData = { id: i, ccu: assignedCCU, duration, steps, input } as WorkerData;
 
-        workerPromises.push(this.createWorker(workerPath, workerData));
+        workerPromises.push(this.createWorker(path.join(__dirname, 'flow.worker.js'), workerData));
       }
 
       const results = await Promise.allSettled(workerPromises);
@@ -181,19 +178,6 @@ export class FlowService {
       console.error(error);
       throw new HttpException("Internal Server Error", 500);
     }
-  }
-
-  private async resolvePath() {
-    if (typeof process.pkg !== 'undefined') {
-      const tmpPath = path.join(os.tmpdir(), `flow.worker.js`);
-
-      const workerCode = fs.readFileSync(path.join(__dirname, 'flow.worker.js'), 'utf8');
-      await fs.promises.writeFile(tmpPath, workerCode, 'utf8');
-
-      return tmpPath;
-    }
-
-    return path.join(__dirname, 'flow.worker.js');
   }
 
   private async createWorker(workerPath: string, workerData: WorkerData): Promise<{ success: number, error: number, latency: number }> {

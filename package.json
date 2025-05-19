@@ -32,7 +32,6 @@
     "drizzle-orm": "^0.40.0",
     "helmet": "^8.0.0",
     "morgan": "^1.10.0",
-    "p-limit": "^6.2.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "zod": "^3.24.2"
@@ -54,5 +53,19 @@
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.7.3"
+  },
+  "bin": "./dist/main.js",
+  "pkg": {
+    "scripts": "./dist/main.js",
+    "assets": [
+      "node_modules/**/*",
+      "dist/modules/flow/flow.worker.js",
+      "dist/migrations/**/*"
+    ],
+    "targets": [
+      "node22-win-x64",
+      "node22-linux-x64"
+    ],
+    "outputPath": "./bin"
   }
 }
