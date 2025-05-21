@@ -8,7 +8,7 @@ const schema = z.object({
     .startsWith("file:", "Try adding 'file:' to resolve")
     .default("file:~/flowtest/data/local.db"),
   APP_URL: z.string().default("http://localhost:5173"),
-  APP_NAME: z.string({ required_error: "APP_NAME is required" }),
+  APP_NAME: z.string({ required_error: "APP_NAME is required" }).default("FlowTest"),
 });
 
 export type Env = z.infer<typeof schema>;

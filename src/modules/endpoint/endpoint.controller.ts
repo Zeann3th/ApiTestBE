@@ -1,4 +1,4 @@
-import { Body, Controller, DefaultValuePipe, Get, HttpCode, Param, Patch, Post, Query, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, DefaultValuePipe, Delete, Get, HttpCode, Param, Patch, Post, Query, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
 import { EndpointService } from './endpoint.service';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBody, ApiConsumes, ApiOperation, ApiParam, ApiQuery } from '@nestjs/swagger';
@@ -39,11 +39,18 @@ export class EndpointController {
     return await this.endpointService.upload(file);
   }
 
-  @ApiOperation({ summary: 'Update endpoint by id' })
+  @ApiOperation({ summary: 'Delete endpoint by id' })
   @ApiParam({ name: 'id', required: true, type: String })
-  @Patch(':id')
-  async update(@Param('id') id: string, @Body() body: any) {
-    return await this.endpointService.update(id, body);
+  @HttpCode(204)
+  @Delete(':id')
+  async delete(@Param('id') id: string) {
+    return await this.endpointService.delete(id);
+  }
 
+  @ApiOperation({ summary: 'Delete all endpoints' })
+  @HttpCode(204)
+  @Delete()
+  async deleteAll() {
+    return await this.endpointService.deleteAll();
   }
 }

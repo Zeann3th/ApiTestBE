@@ -137,10 +137,10 @@ export class FlowService {
     const steps = await this.db.select().from(flowSteps)
       .where(eq(flowSteps.flowId, id))
       .leftJoin(endpoints, eq(flowSteps.endpointId, endpoints.id))
-      .orderBy(flowSteps.sequence)
+      .orderBy(flowSteps.sequence);
 
     try {
-      const workerPromises: Promise<{ success: number, error: number, latency: number }>[] = [];
+      const workerPromises: Promise<{ total: number, error: number, latency: number }>[] = [];
       const startedAt = new Date().toISOString();
 
       for (let i = 1; i <= threads; i++) {
@@ -153,45 +153,50 @@ export class FlowService {
       const results = await Promise.allSettled(workerPromises);
       const stats = results.reduce((acc, result) => {
         if (result.status === 'fulfilled') {
-          acc.success += result.value.success;
+          acc.total += result.value.total;
           acc.error += result.value.error;
           acc.latency += result.value.latency;
         } else {
           console.error(`Worker failed: ${result.reason}`);
+          acc.failed = true;
         }
         return acc;
-      }, { success: 0, error: 0, latency: 0 });
+      }, { total: 0, error: 0, latency: 0, failed: false });
+
+
+      const success = stats.total - stats.error;
 
       await this.db.insert(flowRuns).values({
         flowId: id,
-        status: "COMPLETED",
+        status: stats.failed ? "FAILED" : "COMPLETED",
         ccu,
         threads,
         startedAt,
         completedAt: new Date().toISOString(),
-        successRate: stats.success / (stats.success + stats.error),
-        throughput: stats.success / duration,
-        latency: stats.latency / stats.success
+        successRate: stats.total > 0 ? success / stats.total : 0,
+        throughput: duration > 0 ? success / duration : 0,
+        latency: stats.total > 0 ? stats.latency / stats.total : 0,
       });
-
     } catch (error) {
       console.error(error);
       throw new HttpException("Internal Server Error", 500);
     }
   }
 
-  private async createWorker(workerPath: string, workerData: WorkerData): Promise<{ success: number, error: number, latency: number }> {
+  private async createWorker(workerPath: string, workerData: WorkerData): Promise<{ total: number, error: number, latency: number }> {
     return new Promise((resolve, reject) => {
-      let success = 0;
+      let total = 0;
       let error = 0;
       let latency = 0;
+
       const worker = new Worker(workerPath, { workerData });
 
       worker.on('message', (message) => {
         if (message.type === 'log') {
           console.log(`Worker ${workerData.id}:`, message.message);
         } else if (message.type === 'success') {
-          success += message.success;
+          total += message.total;
+          error += message.error;
           latency += message.latency;
         }
       });
@@ -206,10 +211,9 @@ export class FlowService {
           console.error(`Worker ${workerData.id} stopped with exit code ${code}`);
           reject(new Error(`Worker exited with code ${code}`));
         } else {
-          resolve({ success, error, latency });
+          resolve({ total, error, latency });
         }
       });
     });
   }
-
 }

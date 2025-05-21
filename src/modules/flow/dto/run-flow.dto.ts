@@ -8,7 +8,7 @@ export class RunFlowDto {
     @IsNotEmpty()
     ccu: number;
 
-    @ApiProperty({ type: "integer", description: "Threads", example: 10 })
+    @ApiProperty({ type: "integer", description: "Threads", example: 4 })
     @Min(1)
     @Max(4)
     @IsInt()
@@ -21,7 +21,7 @@ export class RunFlowDto {
     @IsNotEmpty()
     duration: number;
 
-    @ApiProperty()
+    @ApiProperty({ description: "Additional input for flow", example: { "baseUrl": "http:/localhost:7554" } })
     @IsOptional()
     input: Record<string, any>;
 }

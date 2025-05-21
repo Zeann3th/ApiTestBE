@@ -62,6 +62,17 @@ export class EndpointService {
     }
   }
 
-  async update(id: string, body: any) {
+  async delete(id: string) {
+    await this.getById(id);
+
+    await this.db.delete(endpoints).where(eq(endpoints.id, id));
+
+    return {};
+  }
+
+  async deleteAll() {
+    await this.db.delete(endpoints);
+
+    return {};
   }
 }
