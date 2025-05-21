@@ -6,85 +6,54 @@ const { ccu, id, duration, steps, input } = workerData as WorkerData;
 
 let stopped = false;
 const endTime = Date.now() + duration * 1000;
-
-setTimeout(() => {
-    stopped = true;
-    parentPort?.postMessage({ type: 'log', message: `Thread ${id} stopped after ${duration}s` });
-}, duration * 1000);
-
-function createLimiter(concurrency: number) {
-    const queue: (() => void)[] = [];
-    let active = 0;
-
-    const next = () => {
-        if (queue.length === 0 || active >= concurrency) return;
-        active++;
-        const task = queue.shift();
-        task?.();
-    };
-
-    return function limit<T>(taskFn: () => Promise<T>): Promise<T> {
-        return new Promise((resolve, reject) => {
-            const run = async () => {
-                try {
-                    const result = await taskFn();
-                    resolve(result);
-                } catch (err) {
-                    reject(err);
-                } finally {
-                    active--;
-                    next();
-                }
-            };
-            queue.push(run);
-            next();
-        });
-    };
-}
-
 const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
 
-async function requestLoop() {
-    let success = 0;
-    let error = 0;
-    let latency = 0;
+const runner = new RunnerService();
 
-    const limit = createLimiter(Math.min(20, ccu));
-
+const spawnUser = async (userId: number, stats: { total: number, error: number, latency: number }) => {
     while (!stopped && Date.now() < endTime) {
-        const promises: Promise<void>[] = [];
-
-        for (let i = 0; i < ccu; i++) {
-            const clonedInput = { ...input };
-
-            promises.push(limit(async () => {
-                const start = performance.now();
-                try {
-                    await RunnerService.runFlow(steps, clonedInput);
-                    success++;
-                    latency += performance.now() - start;
-                } catch (err: any) {
-                    error++;
-                    parentPort?.postMessage({ type: 'log', message: `Thread ${id} error: ${err.message}` });
-                }
-            }));
+        const clonedInput = structuredClone(input);
+        const start = performance.now();
+        try {
+            await runner.runFlow(steps, clonedInput);
+        } catch (err: any) {
+            stats.error++;
+            parentPort?.postMessage({ type: 'log', message: `Thread ${id} User ${userId} error: ${err.message}` });
+        } finally {
+            stats.total++;
+            stats.latency += performance.now() - start;
         }
 
-        await Promise.allSettled(promises);
-        await delay(100);
+        await delay(90 + Math.floor(Math.random() * 40));
     }
+}
+
+const runUsers = async () => {
+    const stats = { total: 0, error: 0, latency: 0 };
+
+    const users: Promise<void>[] = [];
+    for (let i = 0; i < ccu; i++) {
+        users.push(spawnUser(i, stats));
+    }
+
+    await Promise.all(users);
 
     parentPort?.postMessage({
         type: 'success',
-        success,
-        error,
-        latency,
+        total: stats.total,
+        error: stats.error,
+        latency: stats.latency,
     });
 
     process.exit(0);
 }
 
-requestLoop().catch(err => {
+setTimeout(() => {
+    stopped = true;
+    parentPort?.postMessage({ type: 'log', message: `Thread ${id} stopping after ${duration}s` });
+}, duration * 1000);
+
+runUsers().catch(err => {
     parentPort?.postMessage({ type: 'log', message: `Thread ${id} fatal error: ${err.message}` });
     process.exit(1);
 });

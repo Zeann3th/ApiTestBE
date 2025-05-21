@@ -46,7 +46,7 @@ async function bootstrap() {
 
   setMiddleware(app);
 
-  if (env.NODE_ENV !== "production") {
+  if (env.NODE_ENV !== "production" && process.pkg === "undefined") {
     const swaggerConfig = new DocumentBuilder()
       .setTitle("Postman BE")
       .setDescription('API documentation for Postman Backend')

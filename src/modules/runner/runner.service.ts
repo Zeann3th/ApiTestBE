@@ -6,11 +6,14 @@ import * as https from 'https';
 
 @Injectable()
 export class RunnerService {
-    constructor() { }
+    private readonly httpAgent: http.Agent;
+    private readonly httpsAgent: https.Agent;
+    constructor() {
+        this.httpAgent = new http.Agent({ keepAlive: true });
+        this.httpsAgent = new https.Agent({ keepAlive: true });
+    }
 
-    static async runFlow(steps: FlowStep[], data: Record<string, any> = {}): Promise<Record<string, any>> {
-        const httpAgent = new http.Agent({ keepAlive: true });
-        const httpsAgent = new https.Agent({ keepAlive: true });
+    async runFlow(steps: FlowStep[], data: Record<string, any> = {}): Promise<Record<string, any>> {
         for (const step of steps) {
             const endpoint = step.endpoints as Endpoint;
             if (!endpoint) continue;
@@ -27,8 +30,9 @@ export class RunnerService {
                     },
                     params: request.parameters,
                     data: request.body || {},
-                    httpAgent,
-                    httpsAgent,
+                    httpAgent: this.httpAgent,
+                    httpsAgent: this.httpsAgent,
+                    validateStatus: (status) => status >= 200 && status < 300,
                 });
 
                 const postProcessors = step.flow_steps?.postProcessor;
@@ -42,19 +46,34 @@ export class RunnerService {
                 }
             } catch (error) {
                 const err = error as AxiosError;
-                throw new Error(`Error in step "${endpoint.name}": ${err.message}`);
+                const endpointName = endpoint.name || 'Unknown endpoint';
+
+                const errorDetails = [
+                    `Error in step "${endpointName}": ${err.message}`,
+                    err.response ? `Status: ${err.response.status}` : '',
+                    err.response?.data ? `Response: ${JSON.stringify(err.response.data)}` : '',
+                    `Request: ${JSON.stringify({
+                        method: request.method,
+                        url: request.url,
+                        headers: request.headers,
+                        params: request.parameters,
+                        data: request.body,
+                    }, null, 2)}`
+                ].filter(Boolean).join('\n');
+
+                throw new Error(errorDetails);
             }
         }
 
         return data;
     }
 
-    private static resolvePath(obj: any, path: string): any {
+    private resolvePath(obj: any, path: string): any {
         const keys = path.split('.');
         return keys.reduce((acc, key) => (acc != null ? acc[key] : undefined), obj);
     }
 
-    private static interpolate(template: Endpoint, data: Record<string, any>): Endpoint {
+    private interpolate(template: Endpoint, data: Record<string, any>): Endpoint {
         const interpolateString = (str: string): string => {
             return str.replace(/\{\{(.*?)\}\}/g, (_, key) => {
                 const keys = key.trim().split('.');
@@ -90,7 +109,7 @@ export class RunnerService {
         };
     }
 
-    private static interpolateUrl(url: string, data: Record<string, any>): string {
+    private interpolateUrl(url: string, data: Record<string, any>): string {
         return url.replace(/:([a-zA-Z0-9_]+)/g, (_, key) => {
             const val = data[key];
             if (val === undefined) {
