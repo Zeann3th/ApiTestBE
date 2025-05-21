@@ -58,9 +58,15 @@
   "pkg": {
     "scripts": "./dist/src/**/*.js",
     "assets": [
-      "node_modules/**/*",
       "dist/src/modules/flow/flow.worker.js",
-      "dist/migrations/**/*"
+      "dist/migrations/**/*",
+      "node_modules/axios/**/*",
+      "node_modules/drizzle-orm/**/*",
+      "node_modules/node-fetch/**/*",
+      "node_modules/fetch-blob/**/*",
+      "node_modules/formdata-polyfill/**/*",
+      "node_modules/data-uri-to-buffer/dist/**/*",
+      "node_modules/@libsql/**/*"
     ],
     "targets": [
       "node22-win-x64",
