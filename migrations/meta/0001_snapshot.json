@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "596c814b-9f27-4fbe-bd7a-20abddd9ed20",
-  "prevId": "00000000-0000-0000-0000-000000000000",
+  "id": "d9eec99c-0d9e-4d2c-96a5-90249b4744b2",
+  "prevId": "596c814b-9f27-4fbe-bd7a-20abddd9ed20",
   "tables": {
     "endpoints": {
       "name": "endpoints",
@@ -79,6 +79,13 @@
         }
       },
       "indexes": {
+        "endpoints_name_idx": {
+          "name": "endpoints_name_idx",
+          "columns": [
+            "name"
+          ],
+          "isUnique": false
+        },
         "endpoints_path_idx": {
           "name": "endpoints_path_idx",
           "columns": [

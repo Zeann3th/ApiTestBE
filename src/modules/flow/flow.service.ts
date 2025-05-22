@@ -2,14 +2,14 @@ import { HttpException, Inject, Injectable } from '@nestjs/common';
 import { DRIZZLE } from 'src/database/drizzle.module';
 import { DrizzleDB } from 'src/common/types/drizzle';
 import { CreateFlowDto } from './dto/create-flow.dto';
-import { endpoints, flowRuns, flows, flowSteps } from 'src/database/schema';
-import { and, asc, count, eq } from 'drizzle-orm';
+import { endpoints, flowLogs, flowRuns, flows, flowSteps } from 'src/database/schema';
+import { and, asc, count, eq, inArray } from 'drizzle-orm';
 import { UpdateFlowDto } from './dto/update-flow.dto';
 import { RunFlowDto } from './dto/run-flow.dto';
 import { Worker } from 'worker_threads';
 import { FlowProcessorDto } from './dto/flow-processor.dto';
-import * as path from 'path';
-import { WorkerData } from 'src/common/types';
+import path from 'path';
+import { ActionNode, WorkerData, WorkerMessage } from 'src/common/types';
 
 @Injectable()
 export class FlowService {
@@ -47,9 +47,10 @@ export class FlowService {
   }
 
   async create({ name, description, sequence }: CreateFlowDto) {
+    let flow: any;
     try {
       await this.db.transaction(async (tx) => {
-        const flow = await tx.insert(flows).values({ name, description }).returning().get();
+        flow = await tx.insert(flows).values({ name, description }).returning().get();
 
         if (sequence) {
           const flowStepValues = sequence.map((endpointId, index) => ({
@@ -61,42 +62,47 @@ export class FlowService {
           await tx.insert(flowSteps).values(flowStepValues);
         }
       });
-      return { message: "Flow created successfully" };
+      return { ...flow, sequence };
     } catch (error) {
-      if (error.code === "SQLITE_CONSTRAINT_FOREIGNKEY") throw new HttpException("All endpoints in sequence must exist", 429);
+      if (error.code === "SQLITE_CONSTRAINT_FOREIGNKEY") throw new HttpException("All endpoints in sequence must exist", 409);
       throw new HttpException("Internal Server Error", 500);
     }
   }
 
   async update(id: string, { name, description, sequence }: UpdateFlowDto) {
     await this.getById(id);
+    let flow: any;
 
-    if (name || description) {
-      await this.db.update(flows)
-        .set({
-          ...(name && { name }),
-          ...(description && { description }),
-        })
-        .where(eq(flows.id, id));
+    try {
+      await this.db.transaction(async (tx) => {
+        if (name || description) {
+          flow = await tx.update(flows)
+            .set({
+              ...(name && { name }),
+              ...(description && { description }),
+            })
+            .where(eq(flows.id, id))
+            .returning().get();
+        }
+
+        if (sequence) {
+          await tx.delete(flowSteps)
+            .where(eq(flowSteps.flowId, id));
+
+          const flowStepValues = sequence.map((endpointId, index) => ({
+            flowId: id,
+            endpointId,
+            sequence: index + 1
+          }));
+
+          await tx.insert(flowSteps).values(flowStepValues);
+        }
+      });
+      return { ...flow, sequence };
+    } catch (error) {
+      if (error.code === "SQLITE_CONSTRAINT_FOREIGNKEY") throw new HttpException("All endpoints in sequence must exist", 409);
+      throw new HttpException("Internal Server Error", 500);
     }
-
-    if (sequence) {
-      const flowStepValues = sequence.map((endpointId, index) => ({
-        flowId: id,
-        endpointId,
-        sequence: index + 1
-      }));
-
-      await this.db.insert(flowSteps).values(flowStepValues)
-        .onConflictDoUpdate({
-          target: [flowSteps.flowId, flowSteps.sequence],
-          set: {
-            endpointId: flowSteps.endpointId,
-            sequence: flowSteps.sequence
-          }
-        });
-    }
-    return { message: "Flow updated successfully" };
   }
 
   async delete(id: string) {
@@ -131,7 +137,7 @@ export class FlowService {
     return { message: "Flow updated successfully" };
   }
 
-  async run(id: string, { ccu, threads, duration, input }: RunFlowDto) {
+  async run(id: string, runId: string, { ccu, threads, duration, input }: RunFlowDto) {
     await this.getById(id);
 
     const steps = await this.db.select().from(flowSteps)
@@ -139,79 +145,76 @@ export class FlowService {
       .leftJoin(endpoints, eq(flowSteps.endpointId, endpoints.id))
       .orderBy(flowSteps.sequence);
 
+    if (steps.length === 0) {
+      throw new HttpException(`Flow ${id} does not have any steps`, 400);
+    }
+
+    const flowRun = await this.db.insert(flowRuns).values({
+      id: runId,
+      flowId: id,
+      ccu,
+      threads,
+      duration
+    }).returning().get();
+
+    const nodes = steps.map((step) => ({
+      ...step.endpoints,
+      postProcessor: step.flow_steps.postProcessor,
+    }) as ActionNode);
+
+    console.log(nodes);
+
     try {
-      const workerPromises: Promise<{ total: number, error: number, latency: number }>[] = [];
-      const startedAt = new Date().toISOString();
+      const workerPromises: Promise<void>[] = [];
+
+      const base = Math.floor(ccu / threads);
+      const remainder = ccu % threads;
 
       for (let i = 1; i <= threads; i++) {
-        const assignedCCU = i === threads ? ccu - (threads - 1) * Math.ceil(ccu / threads) : Math.ceil(ccu / threads);
-        const workerData = { id: i, ccu: assignedCCU, duration, steps, input } as WorkerData;
+        const assignedCCU = base + (i <= remainder ? 1 : 0);
+
+        const workerData = {
+          workerId: i,
+          runId: flowRun.id,
+          ccu: assignedCCU,
+          duration,
+          nodes,
+          input
+        } as WorkerData;
 
         workerPromises.push(this.createWorker(path.join(__dirname, 'flow.worker.js'), workerData));
       }
 
-      const results = await Promise.allSettled(workerPromises);
-      const stats = results.reduce((acc, result) => {
-        if (result.status === 'fulfilled') {
-          acc.total += result.value.total;
-          acc.error += result.value.error;
-          acc.latency += result.value.latency;
-        } else {
-          console.error(`Worker failed: ${result.reason}`);
-          acc.failed = true;
-        }
-        return acc;
-      }, { total: 0, error: 0, latency: 0, failed: false });
-
-
-      const success = stats.total - stats.error;
-
-      await this.db.insert(flowRuns).values({
-        flowId: id,
-        status: stats.failed ? "FAILED" : "COMPLETED",
-        ccu,
-        threads,
-        startedAt,
-        completedAt: new Date().toISOString(),
-        successRate: stats.total > 0 ? success / stats.total : 0,
-        throughput: duration > 0 ? success / duration : 0,
-        latency: stats.total > 0 ? stats.latency / stats.total : 0,
-      });
+      await Promise.allSettled(workerPromises);
     } catch (error) {
       console.error(error);
       throw new HttpException("Internal Server Error", 500);
     }
   }
 
-  private async createWorker(workerPath: string, workerData: WorkerData): Promise<{ total: number, error: number, latency: number }> {
+  private async createWorker(workerPath: string, workerData: WorkerData): Promise<void> {
     return new Promise((resolve, reject) => {
-      let total = 0;
-      let error = 0;
-      let latency = 0;
-
       const worker = new Worker(workerPath, { workerData });
 
-      worker.on('message', (message) => {
-        if (message.type === 'log') {
-          console.log(`Worker ${workerData.id}:`, message.message);
-        } else if (message.type === 'success') {
-          total += message.total;
-          error += message.error;
-          latency += message.latency;
+      worker.on("message", async (message: WorkerMessage) => {
+        if (message.type === "log") {
+          await this.db.insert(flowLogs).values(message.payload);
+        } else if (message.type === "done") {
+          console.log(message.payload);
+          resolve();
+        } else if (message.type === "info") {
+          console.log(message.payload);
         }
       });
 
-      worker.on('error', (error) => {
-        console.error(`Worker ${workerData.id} error:`, error);
+      worker.on("error", (error) => {
+        console.error("Worker error", error);
         reject(error);
       });
 
-      worker.on('exit', (code) => {
+      worker.on("exit", (code) => {
         if (code !== 0) {
-          console.error(`Worker ${workerData.id} stopped with exit code ${code}`);
-          reject(new Error(`Worker exited with code ${code}`));
-        } else {
-          resolve({ total, error, latency });
+          reject(new Error(`Worker stopped with exit code ${code}`));
         }
       });
     });

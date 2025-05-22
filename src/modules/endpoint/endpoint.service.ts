@@ -1,5 +1,5 @@
 import { HttpException, Inject, Injectable } from '@nestjs/common';
-import { and, count, eq, sql } from 'drizzle-orm';
+import { count, eq, like, sql } from 'drizzle-orm';
 import { DRIZZLE } from 'src/database/drizzle.module';
 import { endpoints } from 'src/database/schema';
 import { DrizzleDB } from 'src/common/types/drizzle';
@@ -74,5 +74,22 @@ export class EndpointService {
     await this.db.delete(endpoints);
 
     return {};
+  }
+
+  async search(name: string, page: number, limit: number) {
+    const term = `%${name}%`;
+    const [[{ total }], endpointList] = await Promise.all([
+      this.db.select({ total: count() }).from(endpoints).where(like(endpoints.name, term)),
+      this.db.select()
+        .from(endpoints)
+        .where(like(endpoints.name, term))
+        .limit(10)
+        .offset((page - 1) * limit)
+    ]);
+
+    return {
+      total,
+      data: endpointList
+    }
   }
 }

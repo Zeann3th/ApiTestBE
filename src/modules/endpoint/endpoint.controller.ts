@@ -20,6 +20,19 @@ export class EndpointController {
     return await this.endpointService.getAll(page, limit);
   }
 
+  @ApiOperation({ summary: 'Get endpoint by name' })
+  @ApiQuery({ name: 'name', required: true, type: String })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @Get('search')
+  async search(
+    @Query('name') name: string,
+    @Query('page', new DefaultValuePipe(1)) page: number,
+    @Query('limit', new DefaultValuePipe(10)) limit: number
+  ) {
+    return await this.endpointService.search(name, page, limit);
+  }
+
   @ApiOperation({ summary: 'Get endpoint by id' })
   @ApiParam({ name: 'id', required: true, type: String })
   @Get(':id')

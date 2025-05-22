@@ -5,6 +5,7 @@ import { ApiBody, ApiOperation, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { UpdateFlowDto } from './dto/update-flow.dto';
 import { RunFlowDto } from './dto/run-flow.dto';
 import { FlowProcessorDto } from './dto/flow-processor.dto';
+import crypto from 'crypto';
 
 @Controller('flows')
 export class FlowController {
@@ -41,8 +42,9 @@ export class FlowController {
   @Post(':id/run')
   @HttpCode(202)
   async run(@Param('id') id: string, @Body() body: RunFlowDto) {
-    this.flowService.run(id, body);
-    return { message: "Flow is running" }
+    const runId = crypto.randomUUID();
+    this.flowService.run(id, runId, body);
+    return { id: runId, message: 'Flow is running' };
   }
 
   @ApiOperation({ summary: 'Update Flow' })
