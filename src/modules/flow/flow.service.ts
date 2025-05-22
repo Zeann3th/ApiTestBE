@@ -162,8 +162,6 @@ export class FlowService {
       postProcessor: step.flow_steps.postProcessor,
     }) as ActionNode);
 
-    console.log(nodes);
-
     try {
       const workerPromises: Promise<void>[] = [];
 
