@@ -84,7 +84,8 @@ export class FlowRunService {
             responseTime: averageResponseTime,
             errorRate,
             imageBuffer: rpsChart,
-            duration
+            duration,
+            rps
         };
 
         return await this.reportService.generateReport(reportData);

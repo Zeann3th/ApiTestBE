@@ -5,4 +5,5 @@ export interface ReportDto {
     errorRate: number;
     imageBuffer: Buffer;
     duration: number;
+    rps: number;
 }

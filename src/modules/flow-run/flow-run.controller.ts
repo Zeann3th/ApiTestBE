@@ -1,6 +1,7 @@
-import { Controller, DefaultValuePipe, Get, Header, Param, Query } from '@nestjs/common';
+import { Controller, DefaultValuePipe, Get, Header, Param, Query, Res } from '@nestjs/common';
 import { FlowRunService } from './flow-run.service';
 import { ApiOperation, ApiParam, ApiQuery } from '@nestjs/swagger';
+import { Response } from 'express';
 
 @Controller('flow-runs')
 export class FlowRunController {
@@ -26,10 +27,15 @@ export class FlowRunController {
 
     @ApiOperation({ summary: 'Generate report for flow run' })
     @ApiParam({ name: 'id', required: true, type: String, description: 'Flow run ID' })
-    @Header('Content-Type', 'application/pdf')
-    @Header('Content-Disposition', 'attachment; filename="report.pdf"')
     @Get(':id/report')
-    async report(@Param('id') id: string) {
-        return await this.flowRunService.report(id);
+    async report(@Param('id') id: string, @Res() res: Response) {
+        const pdfBuffer = await this.flowRunService.report(id);
+
+        res.set({
+            'Content-Type': 'application/pdf',
+            'Content-Disposition': 'attachment; filename="report.pdf"',
+            'Content-Length': pdfBuffer.length.toString(),
+        });
+        res.end(pdfBuffer);
     }
 }

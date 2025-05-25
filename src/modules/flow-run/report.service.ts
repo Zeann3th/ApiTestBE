@@ -1,56 +1,66 @@
 import { Injectable } from '@nestjs/common';
 import PDFDocument from 'pdfkit';
-import { PassThrough } from 'stream';
 import { ReportDto } from './dto/report.dto';
 
 @Injectable()
 export class ReportService {
     async generateReport(data: ReportDto): Promise<Buffer> {
-        const doc = new PDFDocument();
-        const chunks: Buffer[] = [];
-
-        const stream = new PassThrough();
-        doc.pipe(stream);
-
-        stream.on('data', chunk => chunks.push(chunk));
-
-        stream.on('error', err => {
-            throw err;
-        });
-
-        doc.fontSize(18).text('Flow Report', { align: 'center', });
-        doc.image(data.imageBuffer, {
-            fit: [500, 400],
-            align: 'center',
-            valign: 'center',
-        });
-        doc.moveDown();
-        // CCU
-        doc.fontSize(14).text(`Concurrent Users: ${data.ccu}`, { align: 'left' });
-        doc.moveDown();
-        // Threads
-        doc.fontSize(14).text(`Threads: ${data.threads}`, { align: 'left' });
-        doc.moveDown();
-        // Duration
-        doc.fontSize(14).text(`Duration: ${data.duration} seconds`, { align: 'left' });
-        doc.moveDown();
-        // Response Time
-        doc.fontSize(14).text(`Average Response Time: ${data.responseTime} ms`, { align: 'left' });
-        doc.moveDown();
-        // Error Rate
-        doc.fontSize(14).text(`Error Rate: ${data.errorRate.toFixed(2)}%`, { align: 'left' });
-        doc.moveDown();
-
-        doc.fontSize(14).text(`Generated on: ${new Date().toLocaleString()}`, { align: 'left' });
-        doc.moveDown();
-
-        doc.end();
-
         return new Promise<Buffer>((resolve, reject) => {
-            stream.on('end', () => {
-                resolve(Buffer.concat(chunks));
+            const doc = new PDFDocument({ margin: 50 });
+            const chunks: Buffer[] = [];
+
+            doc.on('data', (chunk) => {
+                chunks.push(chunk);
             });
-            stream.on('error', reject);
+
+            doc.on('end', () => {
+                const finalBuffer = Buffer.concat(chunks);
+                resolve(finalBuffer);
+            });
+
+            doc.on('error', (error) => {
+                reject(error);
+            });
+
+            try {
+                doc.fontSize(20).text('Flow Run Report', { align: 'center' });
+                doc.moveDown(2);
+
+                doc.image(data.imageBuffer, 50, doc.y, {
+                    fit: [500, 300],
+                    align: 'center'
+                });
+                doc.moveDown(15);
+
+                doc.fontSize(12);
+                doc.text(`Concurrent Users: ${data.ccu || 'N/A'}`);
+                doc.moveDown(0.5);
+
+                doc.text(`Threads: ${data.threads || 'N/A'}`);
+                doc.moveDown(0.5);
+
+                doc.text(`Duration: ${data.duration?.toFixed(2) || 'N/A'} seconds`);
+                doc.moveDown(0.5);
+
+                doc.text(`Average Response Time: ${data.responseTime?.toFixed(2) || 'N/A'} ms`);
+                doc.moveDown(0.5);
+
+                doc.text(`Error Rate: ${data.errorRate?.toFixed(2) || 'N/A'}%`);
+                doc.moveDown(0.5);
+
+                doc.text(`Requests per Second: ${data.rps?.toFixed(2) || 'N/A'}`);
+                doc.moveDown(2);
+
+                doc.text(`Generated on: ${new Date().toLocaleString()}`);
+
+                console.log('Content added, finalizing PDF...');
+
+                doc.end();
+
+            } catch (error) {
+                console.error('Error during PDF content creation:', error);
+                reject(error);
+            }
         });
     }
 }

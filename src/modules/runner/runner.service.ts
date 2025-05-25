@@ -18,6 +18,8 @@ export class RunnerService {
             throw new Error('Endpoint is not defined');
         }
 
+        console.log(data);
+
         const request = this.interpolate(node, data);
 
         try {
