@@ -36,14 +36,17 @@ export class FlowService {
       throw new HttpException(`Flow ${id} does not exist`, 404)
     }
 
-    const steps = await this.db.select({ endpointId: flowSteps.endpointId })
+    const steps = await this.db.select()
       .from(flowSteps)
       .where(eq(flowSteps.flowId, id))
+      .leftJoin(endpoints, eq(flowSteps.endpointId, endpoints.id))
       .orderBy(asc(flowSteps.sequence));
 
-    const stepIds = steps.map(({ endpointId }) => (endpointId));
+    const endpointList = steps.map(({ flow_steps, endpoints }) => {
+      return { ...endpoints, postProcessor: flow_steps.postProcessor };
+    })
 
-    return { ...flow, sequence: stepIds };
+    return { ...flow, sequence: endpointList };
   }
 
   async create({ name, description, sequence }: CreateFlowDto) {
@@ -184,6 +187,9 @@ export class FlowService {
       }
 
       await Promise.allSettled(workerPromises);
+      await this.db.update(flowRuns)
+        .set({ status: "COMPLETED", updatedAt: new Date().toISOString() })
+        .where(eq(flowRuns.id, flowRun.id));
     } catch (error) {
       console.error(error);
       throw new HttpException("Internal Server Error", 500);

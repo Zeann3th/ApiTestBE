@@ -1,1 +1,0 @@
-CREATE INDEX `endpoints_name_idx` ON `endpoints` (`name`);

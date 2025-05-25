@@ -39,9 +39,12 @@ export const flowSteps = sqliteTable("flow_steps", {
 export const flowRuns = sqliteTable("flow_runs", {
   id: text("id").primaryKey().$default(() => crypto.randomUUID()),
   flowId: text("flow_id").references(() => flows.id, { onDelete: "cascade" }).notNull(),
-  ccu: integer("ccu"),
-  threads: integer("threads"),
-  duration: integer("duration"),
+  status: text("status", { enum: ["PENDING", "COMPLETED"] }).$default(() => "PENDING").notNull(),
+  ccu: integer("ccu").notNull(),
+  threads: integer("threads").notNull(),
+  duration: integer("duration").notNull(),
+  createdAt: text("created_at").$default(() => new Date().toISOString()).notNull(),
+  updatedAt: text("updated_at").$default(() => new Date().toISOString()).notNull(),
 });
 
 export const flowLogs = sqliteTable("flow_logs", {
