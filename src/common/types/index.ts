@@ -51,3 +51,14 @@ export type WorkerMessage =
             message: string;
         }
     };
+
+export interface ReportData {
+    flowRunId: string;
+    ccu: number;
+    threads: number;
+    responseTime: number;
+    errorRate: number;
+    charts: Array<Buffer>;
+    duration: number;
+    rps: number;
+}
