@@ -1,90 +1,75 @@
-import { parentPort, workerData } from 'worker_threads';
-import { RunnerService } from '../runner/runner.service';
-import { WorkerData } from 'src/common/types';
+import { parentPort, workerData } from "worker_threads";
+import { RunnerService } from "../runner/runner.service";
 
-const { ccu, id, duration, steps, input } = workerData as WorkerData;
+const { ccu, workerId, duration, nodes, input, runId } = workerData;
 
-let stopped = false;
+const runner = new RunnerService();
 const endTime = Date.now() + duration * 1000;
+let stopped = false;
 
-setTimeout(() => {
-    stopped = true;
-    parentPort?.postMessage({ type: 'log', message: `Thread ${id} stopped after ${duration}s` });
-}, duration * 1000);
+const delay = (ms: number) => new Promise((res) => setTimeout(res, ms));
 
-function createLimiter(concurrency: number) {
-    const queue: (() => void)[] = [];
-    let active = 0;
-
-    const next = () => {
-        if (queue.length === 0 || active >= concurrency) return;
-        active++;
-        const task = queue.shift();
-        task?.();
-    };
-
-    return function limit<T>(taskFn: () => Promise<T>): Promise<T> {
-        return new Promise((resolve, reject) => {
-            const run = async () => {
-                try {
-                    const result = await taskFn();
-                    resolve(result);
-                } catch (err) {
-                    reject(err);
-                } finally {
-                    active--;
-                    next();
-                }
-            };
-            queue.push(run);
-            next();
-        });
-    };
-}
-
-const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
-
-async function requestLoop() {
-    let success = 0;
-    let error = 0;
-    let latency = 0;
-
-    const limit = createLimiter(Math.min(20, ccu));
-
+async function spawnUser() {
     while (!stopped && Date.now() < endTime) {
-        const promises: Promise<void>[] = [];
+        let data = structuredClone(input);
 
-        for (let i = 0; i < ccu; i++) {
-            const clonedInput = { ...input };
-
-            promises.push(limit(async () => {
+        for (const node of nodes) {
+            try {
                 const start = performance.now();
-                try {
-                    await RunnerService.runFlow(steps, clonedInput);
-                    success++;
-                    latency += performance.now() - start;
-                } catch (err: any) {
-                    error++;
-                    parentPort?.postMessage({ type: 'log', message: `Thread ${id} error: ${err.message}` });
-                }
-            }));
+                data = (await runner.run(node, data)).data;
+
+                const latency = performance.now() - start;
+                parentPort?.postMessage({
+                    type: "log",
+                    payload: {
+                        runId,
+                        endpointId: node.id,
+                        statusCode: 200,
+                        responseTime: latency,
+                        error: null,
+                    },
+                });
+            } catch (err) {
+                parentPort?.postMessage({
+                    type: "log",
+                    payload: {
+                        runId,
+                        endpointId: node.id,
+                        statusCode: err.response?.status || 500,
+                        responseTime: 0,
+                        error: err.message,
+                    },
+                });
+            }
         }
 
-        await Promise.allSettled(promises);
-        await delay(100);
+        await delay(90 + Math.floor(Math.random() * 40));
+    }
+}
+
+async function run() {
+    const users: Promise<void>[] = [];
+    for (let i = 0; i < ccu; i++) {
+        users.push(spawnUser());
     }
 
-    parentPort?.postMessage({
-        type: 'success',
-        success,
-        error,
-        latency,
-    });
+    await Promise.all(users);
 
+    parentPort?.postMessage({ type: "done", message: `[Run ${runId}] Worker ${workerId} stopped after ${duration}s` });
     process.exit(0);
 }
 
-requestLoop().catch(err => {
-    parentPort?.postMessage({ type: 'log', message: `Thread ${id} fatal error: ${err.message}` });
+setTimeout(() => {
+    stopped = true;
+    parentPort?.postMessage({ type: "info", payload: { message: `[Run ${runId}] Worker ${workerId} stopped after ${duration}s` } });
+}, duration * 1000);
+
+run().catch((err) => {
+    parentPort?.postMessage({
+        type: "error",
+        payload: {
+            message: `[Run ${runId}] Worker ${workerId} crashed: ${err.message}`,
+        },
+    });
     process.exit(1);
 });

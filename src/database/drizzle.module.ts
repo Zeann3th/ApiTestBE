@@ -43,10 +43,10 @@ export const DRIZZLE = Symbol("Drizzle Connection");
         const db = drizzle(client, { schema }) as LibSQLDatabase<typeof schema>;
 
         try {
-          logger.log(path.join(__dirname, "migrations"));
           await migrate(db, {
             migrationsFolder: path.join(__dirname, "..", "..", "migrations")
           });
+          await db.run("PRAGMA journal_mode=WAL");
           logger.log("Database migrated successfully");
         } catch (error) {
           logger.log("Database migration failed", error);

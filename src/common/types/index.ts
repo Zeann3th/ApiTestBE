@@ -13,17 +13,41 @@ export class PostProcessor {
     assert?: Record<string, string>;
 }
 
-export interface FlowStep {
-    endpoints: Endpoint;
-    flow_steps?: {
-        postProcessor?: PostProcessor;
-    }
+export interface ActionNode extends Endpoint {
+    id: string;
+    postProcessor?: PostProcessor;
 }
 
 export interface WorkerData {
     ccu: number;
-    id: number;
+    workerId: number;
+    runId: string;
     duration: number;
-    steps: FlowStep[];
+    nodes: ActionNode[];
     input: Record<string, any>;
 }
+
+export type WorkerMessage =
+    | {
+        type: "log";
+        payload: {
+            runId: string;
+            endpointId: string;
+            statusCode: number;
+            responseTime: number;
+            error: string | null;
+            createdAt: string;
+        };
+    }
+    | {
+        type: "done";
+        payload: {
+            message: string;
+        }
+    }
+    | {
+        type: "info";
+        payload: {
+            message: string;
+        }
+    };

@@ -7,6 +7,7 @@ import { EndpointModule } from './endpoint/endpoint.module';
 import { FlowModule } from './flow/flow.module';
 import { ParserModule } from './parser/parser.module';
 import { RunnerModule } from './runner/runner.module';
+import { FlowRunModule } from './flow-run/flow-run.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { RunnerModule } from './runner/runner.module';
     FlowModule,
     ParserModule,
     RunnerModule,
+    FlowRunModule,
   ],
   providers: [
     {

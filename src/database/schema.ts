@@ -1,4 +1,4 @@
-import { integer, real, sqliteTable, text, unique } from "drizzle-orm/sqlite-core";
+import { index, integer, real, sqliteTable, text, unique } from "drizzle-orm/sqlite-core";
 
 export const endpoints = sqliteTable("endpoints", {
   id: text("id").primaryKey().$default(() => crypto.randomUUID()),
@@ -12,7 +12,8 @@ export const endpoints = sqliteTable("endpoints", {
   createdAt: text("created_at").$default(() => new Date().toISOString()).notNull(),
   updatedAt: text("updated_at").$default(() => new Date().toISOString()).notNull(),
 }, (table) => [
-  unique("endpoints_path_idx").on(table.method, table.url)
+  unique("endpoints_path_idx").on(table.method, table.url),
+  index("endpoints_name_idx").on(table.name)
 ]);
 
 export const flows = sqliteTable("flows", {
@@ -26,7 +27,7 @@ export const flows = sqliteTable("flows", {
 export const flowSteps = sqliteTable("flow_steps", {
   id: text("id").primaryKey().$default(() => crypto.randomUUID()),
   flowId: text("flow_id").references(() => flows.id, { onDelete: "cascade" }).notNull(),
-  endpointId: text("endpoint_id").references(() => endpoints.id, { onDelete: "set null" }).notNull(),
+  endpointId: text("endpoint_id").references(() => endpoints.id, { onDelete: "cascade" }).notNull(),
   postProcessor: text("post_processor", { mode: "json" }),
   sequence: integer("sequence").notNull(),
   createdAt: text("created_at").$default(() => new Date().toISOString()).notNull(),
@@ -38,13 +39,20 @@ export const flowSteps = sqliteTable("flow_steps", {
 export const flowRuns = sqliteTable("flow_runs", {
   id: text("id").primaryKey().$default(() => crypto.randomUUID()),
   flowId: text("flow_id").references(() => flows.id, { onDelete: "cascade" }).notNull(),
-  status: text("status", { enum: ["PENDING", "RUNNING", "COMPLETED", "FAILED"] }).$default(() => "PENDING").notNull(),
-  latency: real("latency"),
-  successRate: real("success_rate").$default(() => 0).notNull(),
-  throughput: real("throughput"),
-  ccu: integer("ccu"),
-  threads: integer("threads"),
-  startedAt: text("started_at").$default(() => new Date().toISOString()).notNull(),
-  completedAt: text("completed_at"),
-  note: text("note"),
+  status: text("status", { enum: ["PENDING", "COMPLETED"] }).$default(() => "PENDING").notNull(),
+  ccu: integer("ccu").notNull(),
+  threads: integer("threads").notNull(),
+  duration: integer("duration").notNull(),
+  createdAt: text("created_at").$default(() => new Date().toISOString()).notNull(),
+  updatedAt: text("updated_at").$default(() => new Date().toISOString()).notNull(),
+});
+
+export const flowLogs = sqliteTable("flow_logs", {
+  id: text("id").primaryKey().$default(() => crypto.randomUUID()),
+  runId: text("run_id").references(() => flowRuns.id, { onDelete: "cascade" }).notNull(),
+  endpointId: text("endpoint_id").references(() => endpoints.id, { onDelete: "cascade" }).notNull(),
+  statusCode: integer("status_code"),
+  responseTime: real("response_time"),
+  error: text("error"),
+  createdAt: text("created_at").$default(() => new Date().toISOString()).notNull(),
 });

@@ -17,10 +17,10 @@ const setMiddleware = (app: NestExpressApplication) => {
   app.use(helmet());
 
   app.enableCors({
-    origin: env.APP_URL || "*",
+    origin: env.APP_URL,
     credentials: true,
     allowedHeaders: ["Content-Type", "Authorization", "Cache-Control"],
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"],
   });
 
   app.use(morgan("combined"));
@@ -46,7 +46,7 @@ async function bootstrap() {
 
   setMiddleware(app);
 
-  if (env.NODE_ENV !== "production") {
+  if (env.NODE_ENV !== "production" && process.pkg === undefined) {
     const swaggerConfig = new DocumentBuilder()
       .setTitle("Postman BE")
       .setDescription('API documentation for Postman Backend')
