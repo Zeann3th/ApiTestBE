@@ -70,9 +70,13 @@ export class RunnerService {
     }
 
     private resolvePath(obj: any, path: string): any {
-        const keys = path.split('.');
-        return keys.reduce((acc, key) => (acc != null ? acc[key] : undefined), obj);
+        const parts = path
+            .replace(/\[(\w+)\]/g, '.$1')
+            .split('.');
+
+        return parts.reduce((acc, key) => (acc != null ? acc[key] : undefined), obj);
     }
+
 
     private interpolate(template: Endpoint, data: Record<string, any>): Endpoint {
         const interpolateString = (str: string): string => {
