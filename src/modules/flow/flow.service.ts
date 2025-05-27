@@ -3,7 +3,7 @@ import { DRIZZLE } from 'src/database/drizzle.module';
 import { DrizzleDB } from 'src/common/types/drizzle';
 import { CreateFlowDto } from './dto/create-flow.dto';
 import { endpoints, flowLogs, flowRuns, flows, flowSteps } from 'src/database/schema';
-import { and, asc, count, eq, inArray } from 'drizzle-orm';
+import { and, asc, count, eq } from 'drizzle-orm';
 import { UpdateFlowDto } from './dto/update-flow.dto';
 import { RunFlowDto } from './dto/run-flow.dto';
 import { Worker } from 'worker_threads';
@@ -207,7 +207,7 @@ export class FlowService {
           console.log(message.payload);
           resolve();
         } else if (message.type === "info") {
-          // console.log(message.payload);
+          console.log(message.payload);
         }
       });
 

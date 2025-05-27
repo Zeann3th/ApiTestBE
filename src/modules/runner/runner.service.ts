@@ -9,21 +9,17 @@ export class RunnerService {
   private readonly axiosInstance: AxiosInstance;
 
   constructor() {
-    const httpAgent = new http.Agent({
+    const agentConfig = {
       keepAlive: true,
-      maxSockets: Infinity,
-      maxFreeSockets: Infinity,
+      maxSockets: 200,
+      maxFreeSockets: 50,
       timeout: 30000,
-      scheduling: 'fifo'
-    });
+      scheduling: 'fifo' as const
+    }
 
-    const httpsAgent = new https.Agent({
-      keepAlive: true,
-      maxSockets: Infinity,
-      maxFreeSockets: Infinity,
-      timeout: 30000,
-      scheduling: 'fifo'
-    });
+    const httpAgent = new http.Agent(agentConfig);
+
+    const httpsAgent = new https.Agent(agentConfig);
 
     this.axiosInstance = axios.create({
       timeout: 30000,
@@ -31,10 +27,13 @@ export class RunnerService {
       httpsAgent,
       headers: {
         'Connection': 'keep-alive',
-        'User-Agent': 'FlowTest/1.0'
+        'User-Agent': 'FlowTest/1.0',
+        'Cache-Control': 'no-cache',
+        'Accept-Encoding': 'gzip, deflate, br',
       },
       validateStatus: (status) => status >= 200 && status < 300,
-      maxRedirects: 5,
+      maxRedirects: 3,
+      decompress: true,
     });
   }
 
@@ -67,8 +66,6 @@ export class RunnerService {
           }
         }
       }
-
-      console.log(data);
 
       return { data, response };
     } catch (error) {

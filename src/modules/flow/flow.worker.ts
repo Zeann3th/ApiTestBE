@@ -13,15 +13,11 @@ const randomDelay = (base: number, variance: number) =>
     base + Math.floor(Math.random() * variance);
 
 async function spawnUser(userId: number) {
+    let data = JSON.parse(JSON.stringify(input));
     const startDelay = randomDelay(userId * 50, 100);
     await delay(startDelay);
 
-    let requestCount = 0;
-    let errorCount = 0;
-
     while (!stopped && Date.now() < endTime) {
-        let data = structuredClone(input);
-
         for (const node of nodes) {
             if (stopped || Date.now() >= endTime) break;
 
@@ -31,8 +27,6 @@ async function spawnUser(userId: number) {
                 const latency = performance.now() - start;
 
                 if (stopped || Date.now() >= endTime) break;
-
-                requestCount++;
 
                 parentPort?.postMessage({
                     type: "log",
@@ -44,20 +38,8 @@ async function spawnUser(userId: number) {
                         error: null,
                     },
                 });
-
-                if (latency > 5000) {
-                    parentPort?.postMessage({
-                        type: "info",
-                        payload: {
-                            message: `[Worker ${workerId}] Slow request: ${latency}ms to ${node.name || node.url}`
-                        }
-                    });
-                }
-
             } catch (err) {
                 if (stopped || Date.now() >= endTime) break;
-
-                errorCount++;
                 const error = err as Error;
 
                 parentPort?.postMessage({
@@ -78,15 +60,6 @@ async function spawnUser(userId: number) {
                         message: `[Worker ${workerId}] Error: ${error.message}`
                     }
                 });
-
-                if (errorCount > 5) {
-                    const delayTime = randomDelay(1000, 2000);
-                    const delayStart = Date.now();
-                    while (Date.now() - delayStart < delayTime && !stopped && Date.now() < endTime) {
-                        await delay(Math.min(100, delayTime - (Date.now() - delayStart)));
-                    }
-                    errorCount = 0;
-                }
             }
         }
 
@@ -98,13 +71,6 @@ async function spawnUser(userId: number) {
             await delay(Math.min(50, delayTime - (Date.now() - delayStart)));
         }
     }
-
-    parentPort?.postMessage({
-        type: "info",
-        payload: {
-            message: `[Worker ${workerId}] User ${userId} completed ${requestCount} requests with ${errorCount} errors`
-        }
-    });
 }
 
 async function run() {
@@ -151,6 +117,13 @@ const statsInterval = setInterval(() => {
     if (!stopped) {
         try {
             const stats = runner.getConnectionStats();
+            const mem = process.memoryUsage();
+            parentPort?.postMessage({
+                type: "info",
+                payload: {
+                    message: `[Worker ${workerId}] Memory: RSS ${Math.round(mem.rss / 1024 / 1024)} MB, HeapUsed ${Math.round(mem.heapUsed / 1024 / 1024)} MB, HeapTotal ${Math.round(mem.heapTotal / 1024 / 1024)} MB`
+                }
+            });
             parentPort?.postMessage({
                 type: "info",
                 payload: {
