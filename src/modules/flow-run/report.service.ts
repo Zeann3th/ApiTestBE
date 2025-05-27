@@ -1,62 +1,146 @@
 import { Injectable } from '@nestjs/common';
 import PDFDocument from 'pdfkit';
-import { ReportDto } from './dto/report.dto';
+import { ReportData } from 'src/common/types';
 
 @Injectable()
 export class ReportService {
-    async generateReport(data: ReportDto): Promise<Buffer> {
+    async generateReport(data: ReportData): Promise<Buffer> {
         return new Promise<Buffer>((resolve, reject) => {
-            const doc = new PDFDocument({ margin: 50 });
+            const doc = new PDFDocument({
+                margin: 50,
+                size: 'A4'
+            });
             const chunks: Buffer[] = [];
 
-            doc.on('data', (chunk) => {
-                chunks.push(chunk);
-            });
-
-            doc.on('end', () => {
-                const finalBuffer = Buffer.concat(chunks);
-                resolve(finalBuffer);
-            });
-
-            doc.on('error', (error) => {
-                reject(error);
-            });
+            doc.on('data', (chunk) => chunks.push(chunk));
+            doc.on('end', () => resolve(Buffer.concat(chunks)));
+            doc.on('error', (error) => reject(error));
 
             try {
-                doc.fontSize(20).text('Flow Run Report', { align: 'center' });
+                const pageWidth = doc.page.width - 100;
+                const columnWidth = (pageWidth - 20) / 2;
+                const leftColumnX = 50;
+                const rightColumnX = leftColumnX + columnWidth + 20;
+
+                doc.fontSize(24)
+                    .font('Helvetica-Bold')
+                    .text(`Report`, { align: 'center' });
+
+                doc.moveDown(1);
+
+                doc.strokeColor('#cccccc')
+                    .lineWidth(1)
+                    .moveTo(50, doc.y)
+                    .lineTo(doc.page.width - 50, doc.y)
+                    .stroke();
+
+                doc.moveDown(1.5);
+
+                doc.fontSize(16)
+                    .font('Helvetica-Bold')
+                    .fillColor('#333333')
+                    .text(`Run ID: ${data.flowRunId}`, { align: 'left' });
+
                 doc.moveDown(2);
 
-                doc.image(data.imageBuffer, 50, doc.y, {
-                    fit: [500, 300],
-                    align: 'center'
+                if (data.charts && data.charts.length > 0) {
+                    doc.fontSize(16)
+                        .font('Helvetica-Bold')
+                        .fillColor('#333333')
+                        .text('Performance Charts', { align: 'left' });
+
+                    doc.moveDown(1);
+
+                    const chartWidth = data.charts.length > 1 ? columnWidth : pageWidth * 0.8;
+                    const chartHeight = 200;
+
+                    data.charts.forEach((chart, index) => {
+                        const isEven = index % 2 === 0;
+                        const xPosition = data.charts.length > 1 && !isEven ? rightColumnX : leftColumnX;
+
+                        if (index > 0 && isEven && data.charts.length > 1) {
+                            doc.moveDown(3);
+                        }
+
+                        const currentY = doc.y;
+
+                        try {
+                            doc.image(chart, xPosition, currentY, {
+                                fit: [chartWidth, chartHeight],
+                            });
+                        } catch (imageError) {
+                            console.warn('Failed to add chart:', imageError);
+                            doc.fontSize(10)
+                                .fillColor('#666666')
+                                .text(`Chart ${index + 1}: Unable to load image`, xPosition, currentY);
+                        }
+
+                        if (data.charts.length === 1 || index === data.charts.length - 1) {
+                            doc.y = currentY + chartHeight + 20;
+                        }
+                    });
+
+                    doc.moveDown(2);
+                }
+
+                doc.fontSize(16)
+                    .font('Helvetica-Bold')
+                    .fillColor('#333333')
+                    .text('Performance Metrics', { align: 'left' });
+
+                doc.moveDown(1);
+
+                const metricsStartY = doc.y;
+
+                doc.fontSize(12)
+                    .font('Helvetica')
+                    .fillColor('#000000');
+
+                const leftMetrics = [
+                    { label: 'Concurrent Users', value: data.ccu ?? 'N/A', unit: '' },
+                    { label: 'Threads', value: data.threads ?? 'N/A', unit: '' },
+                    { label: 'Duration', value: data.duration?.toFixed(2) ?? 'N/A', unit: ' seconds' }
+                ];
+
+                const rightMetrics = [
+                    { label: 'Avg Response Time', value: data.responseTime?.toFixed(2) ?? 'N/A', unit: ' ms' },
+                    { label: 'Error Rate', value: data.errorRate?.toFixed(2) ?? 'N/A', unit: '%' },
+                    { label: 'Generated', value: new Date().toLocaleString(), unit: '' }
+                ];
+
+                // Vẽ cột trái
+                let currentY = metricsStartY;
+                leftMetrics.forEach((metric) => {
+                    doc.font('Helvetica-Bold')
+                        .text(metric.label + ':', leftColumnX, currentY);
+
+                    doc.font('Helvetica')
+                        .fillColor('#0066cc')
+                        .text(metric.value + metric.unit, leftColumnX + 120, currentY);
+
+                    currentY += 25;
+                    doc.fillColor('#000000');
                 });
-                doc.moveDown(15);
 
-                doc.fontSize(12);
-                doc.text(`Concurrent Users: ${data.ccu || 'N/A'}`);
-                doc.moveDown(0.5);
+                // Vẽ cột phải
+                currentY = metricsStartY;
+                rightMetrics.forEach((metric) => {
+                    doc.font('Helvetica-Bold')
+                        .fillColor('#000000')
+                        .text(metric.label + ':', rightColumnX, currentY);
 
-                doc.text(`Threads: ${data.threads || 'N/A'}`);
-                doc.moveDown(0.5);
+                    doc.font('Helvetica')
+                        .fillColor('#0066cc')
+                        .text(metric.value + metric.unit, rightColumnX + 120, currentY);
 
-                doc.text(`Duration: ${data.duration?.toFixed(2) || 'N/A'} seconds`);
-                doc.moveDown(0.5);
+                    currentY += 25;
+                    doc.fillColor('#000000');
+                });
 
-                doc.text(`Average Response Time: ${data.responseTime?.toFixed(2) || 'N/A'} ms`);
-                doc.moveDown(0.5);
-
-                doc.text(`Error Rate: ${data.errorRate?.toFixed(2) || 'N/A'}%`);
-                doc.moveDown(0.5);
-
-                doc.text(`Requests per Second: ${data.rps?.toFixed(2) || 'N/A'}`);
+                doc.y = Math.max(metricsStartY + (leftMetrics.length * 25), metricsStartY + (rightMetrics.length * 25));
                 doc.moveDown(2);
-
-                doc.text(`Generated on: ${new Date().toLocaleString()}`);
-
-                console.log('Content added, finalizing PDF...');
 
                 doc.end();
-
             } catch (error) {
                 console.error('Error during PDF content creation:', error);
                 reject(error);

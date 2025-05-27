@@ -13,63 +13,17 @@ export class ChartService {
         });
     }
 
-    async createLineChart(data: { [second: string]: number }): Promise<Buffer> {
+    async createRPSChart(data: { [second: string]: number }): Promise<Buffer> {
         try {
-            const sortedKeys = Object.keys(data).sort((a, b) => parseInt(a) - parseInt(b));
-            const values = sortedKeys.map(key => data[key]);
-
-            const labels = sortedKeys.map(timestamp => {
-                const date = new Date(parseInt(timestamp) * 1000);
-                return date.toLocaleTimeString('en-US', {
-                    hour12: false,
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    second: '2-digit'
-                });
-            });
-
-            if (labels.length === 0) {
-                const configuration = {
-                    type: 'line' as const,
-                    data: {
-                        labels: ['0'],
-                        datasets: [{
-                            label: 'No data available',
-                            data: [0],
-                            borderColor: 'rgba(75,192,192,1)',
-                            backgroundColor: 'rgba(75,192,192,0.2)',
-                        }]
-                    },
-                    options: {
-                        responsive: false,
-                        scales: {
-                            x: {
-                                title: { display: true, text: 'Time (s)' }
-                            },
-                            y: {
-                                beginAtZero: true,
-                                title: { display: true, text: 'Requests' }
-                            }
-                        },
-                        plugins: {
-                            legend: { display: true },
-                            title: {
-                                display: true,
-                                text: 'Requests per Second Over Time'
-                            }
-                        }
-                    }
-                };
-                return await this.chartCanvas.renderToBuffer(configuration);
-            }
+            const keys = Object.keys(data);
 
             const configuration = {
                 type: 'line' as const,
                 data: {
-                    labels,
+                    labels: keys,
                     datasets: [{
-                        label: 'Requests per second',
-                        data: values,
+                        label: 'Requests per Second',
+                        data: keys.map(k => data[k]),
                         borderColor: 'rgba(75,192,192,1)',
                         backgroundColor: 'rgba(75,192,192,0.2)',
                         fill: true,
@@ -84,7 +38,7 @@ export class ChartService {
                         x: {
                             title: {
                                 display: true,
-                                text: 'Time (seconds)',
+                                text: 'Time (HH:MM:SS)',
                                 font: { size: 12 }
                             }
                         },
@@ -104,18 +58,75 @@ export class ChartService {
                         },
                         title: {
                             display: true,
-                            text: 'Requests per Second Over Time',
+                            text: 'Requests per Second',
                             font: { size: 16 }
                         }
                     }
                 }
             };
 
-            const buffer = await this.chartCanvas.renderToBuffer(configuration);
-            return buffer;
-
+            return await this.chartCanvas.renderToBuffer(configuration);
         } catch (error) {
             console.error('Error creating chart:', error);
+            throw error;
+        }
+    }
+
+    async createResponseTimeChart(data: { [time: string]: number }): Promise<Buffer> {
+        try {
+            const keys = Object.keys(data);
+
+            const configuration = {
+                type: 'line' as const,
+                data: {
+                    labels: keys,
+                    datasets: [{
+                        label: 'Average Response Time (ms)',
+                        data: keys.map(k => data[k]),
+                        borderColor: 'rgba(255,99,132,1)',
+                        backgroundColor: 'rgba(255,99,132,0.2)',
+                        fill: true,
+                        tension: 0.3,
+                        pointRadius: 3,
+                        pointHoverRadius: 5,
+                    }]
+                },
+                options: {
+                    responsive: false,
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Time (HH:MM:SS)',
+                                font: { size: 12 }
+                            }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Response Time (ms)',
+                                font: { size: 12 }
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top' as const
+                        },
+                        title: {
+                            display: true,
+                            text: 'Average Response Time Over Time',
+                            font: { size: 16 }
+                        }
+                    }
+                }
+            };
+
+            return await this.chartCanvas.renderToBuffer(configuration);
+        } catch (error) {
+            console.error('Error creating response time chart:', error);
             throw error;
         }
     }

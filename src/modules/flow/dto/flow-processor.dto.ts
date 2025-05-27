@@ -9,7 +9,13 @@ export class FlowProcessorDto {
     @IsNotEmpty()
     sequence: number;
 
-    @ApiProperty()
+    @ApiProperty({
+        example: {
+            "extract": {
+                "access_token": "accessToken",
+            }
+        }
+    })
     @IsNotEmpty()
     @Type(() => PostProcessor)
     postProcessor: PostProcessor;

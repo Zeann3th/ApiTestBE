@@ -89,16 +89,16 @@ export class FlowService {
         }
 
         if (sequence) {
-          await tx.delete(flowSteps)
-            .where(eq(flowSteps.flowId, id));
-
           const flowStepValues = sequence.map((endpointId, index) => ({
             flowId: id,
             endpointId,
             sequence: index + 1
           }));
 
-          await tx.insert(flowSteps).values(flowStepValues);
+          await tx.insert(flowSteps).values(flowStepValues).onConflictDoUpdate({
+            target: [flowSteps.flowId, flowSteps.sequence],
+            set: { endpointId: flowSteps.endpointId }
+          });
         }
       });
       return { ...flow, sequence };
@@ -207,7 +207,7 @@ export class FlowService {
           console.log(message.payload);
           resolve();
         } else if (message.type === "info") {
-          console.log(message.payload);
+          // console.log(message.payload);
         }
       });
 
