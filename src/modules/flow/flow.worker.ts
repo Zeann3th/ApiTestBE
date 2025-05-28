@@ -23,7 +23,13 @@ type WorkerMessage =
         type: "info";
         payload: {
             message: string;
-        }
+        };
+    }
+    | {
+        type: "error";
+        payload: {
+            message: string;
+        };
     };
 
 // Khởi tạo

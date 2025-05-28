@@ -51,6 +51,12 @@ export type WorkerMessage =
         payload: {
             message: string;
         }
+    }
+    | {
+        type: "error";
+        payload: {
+            message: string;
+        };
     };
 
 export interface ReportData {
