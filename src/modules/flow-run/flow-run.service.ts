@@ -5,6 +5,7 @@ import { DRIZZLE } from 'src/database/drizzle.module';
 import { flowLogs, flowRuns } from 'src/database/schema';
 import { ChartService } from './chart.service';
 import { ReportService } from './report.service';
+import { ReportData } from 'src/common/types';
 
 @Injectable()
 export class FlowRunService {
@@ -57,19 +58,36 @@ export class FlowRunService {
             avgResponseTime: sql<number>`AVG(${flowLogs.responseTime})`
         }).from(flowLogs).where(eq(flowLogs.runId, id));
 
-        const bucketSizeSec = 5;
+        const responseTimes = logs
+            .map(log => log.responseTime ?? 0)
+            .filter(time => time > 0)
+            .sort((a, b) => a - b);
+
+        const calculatePercentile = (arr: number[], percentile: number): number => {
+            if (arr.length === 0) return 0;
+            const index = Math.ceil((percentile / 100) * arr.length) - 1;
+            return arr[Math.max(0, Math.min(index, arr.length - 1))];
+        };
+
+        const responseTimeStats = {
+            average: logStats.avgResponseTime ?? 0,
+            max: responseTimes.length > 0 ? Math.max(...responseTimes) : 0,
+            min: responseTimes.length > 0 ? Math.min(...responseTimes) : 0,
+            p90: calculatePercentile(responseTimes, 90),
+            p95: calculatePercentile(responseTimes, 95),
+            p99: calculatePercentile(responseTimes, 99)
+        };
+
         const requestsPerSecond: Record<string, number> = {};
-        const responseTimesPerBucket: Record<string, number[]> = {};
+        const responseTimesPerSecond: Record<string, number[]> = {};
 
         for (const log of logs) {
             const ms = typeof log.createdAt === 'string'
                 ? new Date(log.createdAt).getTime()
                 : log.createdAt;
 
-            const bucketSec = Math.floor(ms / 1000 / bucketSizeSec) * bucketSizeSec;
-            const bucketMs = bucketSec * 1000;
-
-            const timeLabel = new Date(bucketMs).toLocaleString('en-US', {
+            const secondTimestamp = Math.floor(ms / 1000) * 1000;
+            const timeLabel = new Date(secondTimestamp).toLocaleString('en-US', {
                 timeZone: 'Asia/Ho_Chi_Minh',
                 hour12: false,
                 hour: '2-digit',
@@ -78,27 +96,24 @@ export class FlowRunService {
             });
 
             requestsPerSecond[timeLabel] = (requestsPerSecond[timeLabel] || 0) + 1;
-
-            if (!responseTimesPerBucket[timeLabel]) responseTimesPerBucket[timeLabel] = [];
-            responseTimesPerBucket[timeLabel].push(log.responseTime ?? 0);
+            if (!responseTimesPerSecond[timeLabel]) responseTimesPerSecond[timeLabel] = [];
+            responseTimesPerSecond[timeLabel].push(log.responseTime ?? 0);
         }
 
-        const avgResponseTimePerBucket: Record<string, number> = {};
-        for (const [key, times] of Object.entries(responseTimesPerBucket)) {
+        const avgResponseTimePerSecond: Record<string, number> = {};
+        for (const [key, times] of Object.entries(responseTimesPerSecond)) {
             const sum = times.reduce((a, b) => a + b, 0);
-            avgResponseTimePerBucket[key] = times.length > 0 ? sum / times.length : 0;
+            avgResponseTimePerSecond[key] = times.length > 0 ? sum / times.length : 0;
         }
-
-        const averageResponseTime = logStats.avgResponseTime ?? 0;
 
         const rpsChart = await this.chartService.createRPSChart(requestsPerSecond);
-        const responseTimeChart = await this.chartService.createResponseTimeChart(avgResponseTimePerBucket);
+        const responseTimeChart = await this.chartService.createResponseTimeChart(avgResponseTimePerSecond);
 
-        const reportData = {
+        const reportData: ReportData = {
             flowRunId: run.id,
             ccu: run.ccu,
             threads: run.threads,
-            responseTime: averageResponseTime,
+            responseTime: responseTimeStats,
             errorRate: (logStats.total ?? 0) > 0 ? (logStats.errorCount ?? 0) / logStats.total * 100 : 0,
             charts: [rpsChart, responseTimeChart],
             duration: run.duration,
@@ -107,5 +122,4 @@ export class FlowRunService {
 
         return await this.reportService.generateReport(reportData);
     }
-
 }

@@ -140,7 +140,7 @@ export class FlowService {
     return { message: "Flow updated successfully" };
   }
 
-  async run(id: string, runId: string, { ccu, threads, duration, input }: RunFlowDto) {
+  async run(id: string, runId: string, { ccu, threads, duration, input, rampUpTime }: RunFlowDto) {
     await this.getById(id);
 
     const steps = await this.db.select().from(flowSteps)
@@ -178,6 +178,7 @@ export class FlowService {
           workerId: i,
           runId: flowRun.id,
           ccu: assignedCCU,
+          rampUpTime,
           duration,
           nodes,
           input
