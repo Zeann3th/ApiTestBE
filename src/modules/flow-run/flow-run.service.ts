@@ -52,30 +52,24 @@ export class FlowRunService {
             throw new HttpException('No logs found for this flow run', 404);
         }
 
-        const [logStats] = await this.db.select({
-            total: sql<number>`COUNT(*)`,
-            errorCount: sql<number>`SUM(CASE WHEN ${flowLogs.error} THEN 1 ELSE 0 END)`,
-            avgResponseTime: sql<number>`AVG(${flowLogs.responseTime})`
-        }).from(flowLogs).where(eq(flowLogs.runId, id));
-
-        const responseTimes = logs
-            .map(log => log.responseTime ?? 0)
-            .filter(time => time > 0)
-            .sort((a, b) => a - b);
+        const [response] = await this.db
+            .select({
+                total: sql<number>`COUNT(*)`,
+                errorCount: sql<number>`SUM(CASE WHEN ${flowLogs.error} THEN 1 ELSE 0 END)`,
+                average: sql<number>`AVG(${flowLogs.responseTime})`,
+                min: sql<number>`MIN(${flowLogs.responseTime})`,
+                max: sql<number>`MAX(${flowLogs.responseTime})`,
+                p90: sql<number>`PERCENTILE_CONT(0.9) WITHIN GROUP (ORDER BY ${flowLogs.responseTime})`,
+                p95: sql<number>`PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY ${flowLogs.responseTime})`,
+                p99: sql<number>`PERCENTILE_CONT(0.99) WITHIN GROUP (ORDER BY ${flowLogs.responseTime})`,
+            })
+            .from(flowLogs)
+            .where(eq(flowLogs.runId, id));
 
         const calculatePercentile = (arr: number[], percentile: number): number => {
             if (arr.length === 0) return 0;
             const index = Math.ceil((percentile / 100) * arr.length) - 1;
             return arr[Math.max(0, Math.min(index, arr.length - 1))];
-        };
-
-        const responseTimeStats = {
-            average: logStats.avgResponseTime ?? 0,
-            max: responseTimes.length > 0 ? Math.max(...responseTimes) : 0,
-            min: responseTimes.length > 0 ? Math.min(...responseTimes) : 0,
-            p90: calculatePercentile(responseTimes, 90),
-            p95: calculatePercentile(responseTimes, 95),
-            p99: calculatePercentile(responseTimes, 99)
         };
 
         const requestsPerSecond: Record<string, number> = {};
@@ -113,11 +107,11 @@ export class FlowRunService {
             flowRunId: run.id,
             ccu: run.ccu,
             threads: run.threads,
-            responseTime: responseTimeStats,
-            errorRate: (logStats.total ?? 0) > 0 ? (logStats.errorCount ?? 0) / logStats.total * 100 : 0,
+            responseTime: response,
+            errorRate: (response.total ?? 0) > 0 ? (response.errorCount ?? 0) / response.total * 100 : 0,
             charts: [rpsChart, responseTimeChart],
             duration: run.duration,
-            rps: (logStats.total ?? 0) / run.duration,
+            rps: (response.total ?? 0) / run.duration,
         };
 
         return await this.reportService.generateReport(reportData);

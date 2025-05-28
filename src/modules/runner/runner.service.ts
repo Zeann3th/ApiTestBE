@@ -86,7 +86,14 @@ export class RunnerService {
 
       return { data, response: { ...response, latency: response['latency'] } };
     } catch (error: any) {
-      return { data, response: { error, latency: error?.latency ?? null } };
+      return {
+        data,
+        response: {
+          status: error?.response?.status ?? null,
+          error,
+          latency: error?.latency ?? null,
+        },
+      };
     }
   }
 

@@ -42,13 +42,21 @@ async function spawnUser() {
                     payload: {
                         runId,
                         endpointId: node.id,
-                        statusCode: response.status,
-                        responseTime: response.latency,
+                        statusCode: response.status ?? 500,
+                        responseTime: response.latency ?? 0,
                         error: response.error ? response.error.message : null,
                     },
                 });
             } catch (error: any) {
-                throw new Error(`Error in node ${node.id}: ${error.message}`);
+                parentPort?.postMessage({
+                    type: 'error',
+                    payload: {
+                        runId,
+                        endpointId: node.id,
+                        message: error?.message ?? String(error),
+                    },
+                });
+                break;
             }
         }
         // Mô phỏng thời gian suy nghĩ, thao tác người dùng
