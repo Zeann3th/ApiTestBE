@@ -44,13 +44,16 @@ export type WorkerMessage =
         type: "done";
         payload: {
             message: string;
-        }
+            workerId: number;
+            totalRequests: number;
+            totalErrors: number;
+        };
     }
     | {
         type: "info";
         payload: {
             message: string;
-        }
+        };
     }
     | {
         type: "error";

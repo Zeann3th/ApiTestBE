@@ -59,12 +59,41 @@ export class FlowRunService {
                 average: sql<number>`AVG(${flowLogs.responseTime})`,
                 min: sql<number>`MIN(${flowLogs.responseTime})`,
                 max: sql<number>`MAX(${flowLogs.responseTime})`,
-                p90: sql<number>`PERCENTILE_CONT(0.9) WITHIN GROUP (ORDER BY ${flowLogs.responseTime})`,
-                p95: sql<number>`PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY ${flowLogs.responseTime})`,
-                p99: sql<number>`PERCENTILE_CONT(0.99) WITHIN GROUP (ORDER BY ${flowLogs.responseTime})`,
             })
             .from(flowLogs)
             .where(eq(flowLogs.runId, id));
+
+        const responseTimesData = await this.db
+            .select({ responseTime: flowLogs.responseTime })
+            .from(flowLogs)
+            .where(eq(flowLogs.runId, id))
+            .orderBy(asc(flowLogs.responseTime));
+
+        const responseTimes = responseTimesData
+            .map(r => r.responseTime)
+            .filter(rt => rt !== null && rt !== undefined) as number[];
+
+        const calculatePercentile = (arr: number[], percentile: number): number => {
+            if (arr.length === 0) return 0;
+            const index = (percentile / 100) * (arr.length - 1);
+            const lower = Math.floor(index);
+            const upper = Math.ceil(index);
+            const weight = index % 1;
+
+            if (upper >= arr.length) return arr[arr.length - 1];
+            return arr[lower] * (1 - weight) + arr[upper] * weight;
+        };
+
+        const p90 = calculatePercentile(responseTimes, 90);
+        const p95 = calculatePercentile(responseTimes, 95);
+        const p99 = calculatePercentile(responseTimes, 99);
+
+        const responseWithPercentiles = {
+            ...response,
+            p90,
+            p95,
+            p99
+        };
 
         const requestsPerSecond: Record<string, number> = {};
         const responseTimesPerSecond: Record<string, number[]> = {};
@@ -97,11 +126,11 @@ export class FlowRunService {
             flowRunId: run.id,
             ccu: run.ccu,
             threads: run.threads,
-            responseTime: response,
-            errorRate: (response.total ?? 0) > 0 ? (response.errorCount ?? 0) / response.total * 100 : 0,
+            responseTime: responseWithPercentiles,
+            errorRate: (responseWithPercentiles.total ?? 0) > 0 ? (responseWithPercentiles.errorCount ?? 0) / responseWithPercentiles.total * 100 : 0,
             charts: [rpsChart, responseTimeChart],
             duration: run.duration,
-            rps: (response.total ?? 0) / run.duration,
+            rps: (responseWithPercentiles.total ?? 0) / run.duration,
         };
 
         return await this.reportService.generateReport(reportData);
