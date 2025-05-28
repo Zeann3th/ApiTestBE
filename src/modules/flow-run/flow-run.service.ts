@@ -66,21 +66,11 @@ export class FlowRunService {
             .from(flowLogs)
             .where(eq(flowLogs.runId, id));
 
-        const calculatePercentile = (arr: number[], percentile: number): number => {
-            if (arr.length === 0) return 0;
-            const index = Math.ceil((percentile / 100) * arr.length) - 1;
-            return arr[Math.max(0, Math.min(index, arr.length - 1))];
-        };
-
         const requestsPerSecond: Record<string, number> = {};
         const responseTimesPerSecond: Record<string, number[]> = {};
 
         for (const log of logs) {
-            const ms = typeof log.createdAt === 'string'
-                ? new Date(log.createdAt).getTime()
-                : log.createdAt;
-
-            const secondTimestamp = Math.floor(ms / 1000) * 1000;
+            const secondTimestamp = Math.floor(new Date(log.createdAt).getTime() / 1000) * 1000;
             const timeLabel = new Date(secondTimestamp).toLocaleString('en-US', {
                 timeZone: 'Asia/Ho_Chi_Minh',
                 hour12: false,

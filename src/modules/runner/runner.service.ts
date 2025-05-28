@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import axios, { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from 'axios';
+import axios, { AxiosInstance, InternalAxiosRequestConfig } from 'axios';
 import { Endpoint, ActionNode } from 'src/common/types';
 import * as http from 'http';
 import * as https from 'https';
@@ -9,12 +9,15 @@ export class RunnerService {
   private readonly axiosInstance: AxiosInstance;
   private readonly REQUEST_TIMEOUT = 30000;
   private readonly SOCKET_TIMEOUT = 30000;
+  private readonly MAX_SOCKETS = 200;
+  private readonly MAX_FREE_SOCKETS = 50;
+
 
   constructor() {
     const agentConfig = {
       keepAlive: true,
-      maxSockets: 200,
-      maxFreeSockets: 50,
+      maxSockets: this.MAX_SOCKETS,
+      maxFreeSockets: this.MAX_FREE_SOCKETS,
       timeout: this.SOCKET_TIMEOUT,
       scheduling: 'fifo' as const
     };
@@ -37,21 +40,15 @@ export class RunnerService {
     });
 
     this.axiosInstance.interceptors.request.use((config: InternalAxiosRequestConfig) => {
-      config.headers['x-start-time'] = Date.now();
+      config.startTime = Date.now();
       return config;
     });
 
     this.axiosInstance.interceptors.response.use(
       (response) => {
-        const startTime = Number(response.config.headers['x-start-time']);
+        const startTime = Number(response.config.startTime);
         response['latency'] = Date.now() - startTime;
         return response;
-      },
-      (error: AxiosError) => {
-        const startTime = Number(error.config?.headers?.['x-start-time']);
-        const latency = startTime ? Date.now() - startTime : null;
-        error['latency'] = latency;
-        return Promise.reject(error);
       }
     );
   }
@@ -61,40 +58,30 @@ export class RunnerService {
 
     const request = this.interpolate(node, data);
 
-    try {
-      const response = await this.axiosInstance({
-        method: request.method,
-        url: request.url,
-        headers: {
-          ...request.headers,
-          'Content-Type': 'application/json',
-        },
-        params: request.parameters,
-        data: request.body || {},
-        signal: abortSignal ?? AbortSignal.timeout(this.REQUEST_TIMEOUT),
-      });
+    const response = await this.axiosInstance({
+      method: request.method,
+      url: request.url,
+      headers: {
+        ...request.headers,
+        'Content-Type': 'application/json',
+      },
+      params: request.parameters,
+      data: request.body || {},
+      signal: abortSignal ?? AbortSignal.timeout(this.REQUEST_TIMEOUT),
+    });
 
-      const postProcessors = node.postProcessor;
-      if (postProcessors?.extract) {
-        for (const [key, path] of Object.entries(postProcessors.extract)) {
-          const value = this.resolvePath(response?.data, path);
-          if (value !== undefined) {
-            data[key] = value;
-          }
+    const postProcessors = node.postProcessor;
+    if (postProcessors?.extract) {
+      for (const [key, path] of Object.entries(postProcessors.extract)) {
+        const value = this.resolvePath(response?.data, path);
+        if (value !== undefined) {
+          data[key] = value;
         }
       }
-
-      return { data, response: { ...response, latency: response['latency'] } };
-    } catch (error: any) {
-      return {
-        data,
-        response: {
-          status: error?.response?.status ?? null,
-          error,
-          latency: error?.latency ?? null,
-        },
-      };
     }
+
+    const { status, headers, data: body } = response;
+    return { data, response: { status, headers, body, latency: response['latency'] } };
   }
 
   private resolvePath(obj: any, path: string): any {

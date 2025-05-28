@@ -70,3 +70,15 @@ export interface ReportData {
     duration: number;
     rps: number;
 }
+
+export class RunnerError extends Error {
+    constructor(
+        message: string,
+        public code?: string,
+        public latency?: number,
+        public status?: number
+    ) {
+        super(message);
+    }
+}
+

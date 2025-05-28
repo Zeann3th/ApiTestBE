@@ -1,6 +1,31 @@
 import { parentPort, workerData } from "worker_threads";
 import { RunnerService } from "../runner/runner.service";
 
+type WorkerMessage =
+    | {
+        type: "log";
+        payload: {
+            runId: string;
+            endpointId: string;
+            statusCode: number;
+            responseTime: number;
+            error: string | null;
+            createdAt: string;
+        };
+    }
+    | {
+        type: "done";
+        payload: {
+            message: string;
+        }
+    }
+    | {
+        type: "info";
+        payload: {
+            message: string;
+        }
+    };
+
 // Khởi tạo
 const { ccu, workerId, duration, rampUpTime, nodes, input, runId } = workerData;
 
@@ -32,31 +57,31 @@ async function spawnUser() {
     while (!stopped && Date.now() < endTime) {
         for (const node of nodes) {
             if (stopped || Date.now() >= endTime) break;
+            let statusCode: number = 500;
+            let responseTime: number = 0;
+            let error: any = null;
 
             try {
                 const { data: runnerData, response } = await runner.run(node, data, abortController.signal);
                 data = runnerData;
 
-                parentPort?.postMessage({
+                statusCode = response.status;
+                responseTime = response.latency;
+            } catch (err: any) {
+                error = err;
+            } finally {
+                const message: WorkerMessage = {
                     type: "log",
                     payload: {
                         runId,
                         endpointId: node.id,
-                        statusCode: response.status ?? 500,
-                        responseTime: response.latency ?? 0,
-                        error: response.error ? response.error.message : null,
-                    },
-                });
-            } catch (error: any) {
-                parentPort?.postMessage({
-                    type: 'error',
-                    payload: {
-                        runId,
-                        endpointId: node.id,
-                        message: error?.message ?? String(error),
-                    },
-                });
-                break;
+                        statusCode,
+                        responseTime,
+                        error: error ? error.message : null,
+                        createdAt: new Date().toISOString(),
+                    }
+                }
+                parentPort?.postMessage(message);
             }
         }
         // Mô phỏng thời gian suy nghĩ, thao tác người dùng
@@ -81,6 +106,14 @@ async function run() {
         const delayTime = Math.floor((i / ccu) * rampUpTime * 1000);
         users.push(
             delay(delayTime).then(() => spawnUser())
+                .catch((err: any) => {
+                    parentPort?.postMessage({
+                        type: "error",
+                        payload: {
+                            message: `[Worker ${workerId}] User ${i + 1} failed: ${err.message}`,
+                        },
+                    });
+                })
         );
     }
 
