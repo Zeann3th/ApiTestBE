@@ -70,11 +70,12 @@
       "node_modules/fetch-blob/**/*",
       "node_modules/formdata-polyfill/**/*",
       "node_modules/data-uri-to-buffer/dist/**/*",
-      "node_modules/@libsql/**/*"
+      "node_modules/@libsql/**/*",
+      "node_modules/pdfkit/js/data/Helvetica.afm",
+      "node_modules/pdfkit/js/data/Helvetica-Bold.afm"
     ],
     "targets": [
-      "node22-win-x64",
-      "node22-linux-x64"
+      "node22-win-x64"
     ],
     "outputPath": "./bin"
   }

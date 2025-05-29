@@ -71,12 +71,19 @@ export class RunnerService {
     });
 
     const postProcessors = node.postProcessor;
-    if (postProcessors?.extract) {
-      for (const [key, path] of Object.entries(postProcessors.extract)) {
-        const value = this.resolvePath(response?.data, path);
-        if (value !== undefined) {
-          data[key] = value;
+
+    if (postProcessors) {
+      if (postProcessors?.extract) {
+        for (const [key, path] of Object.entries(postProcessors.extract)) {
+          const value = this.resolvePath(response?.data, path);
+          if (value !== undefined) {
+            data[key] = value;
+          }
         }
+      }
+
+      if (postProcessors?.delay) {
+        await new Promise(resolve => setTimeout(resolve, postProcessors.delay));
       }
     }
 

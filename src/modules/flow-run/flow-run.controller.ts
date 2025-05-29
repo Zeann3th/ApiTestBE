@@ -3,7 +3,7 @@ import { FlowRunService } from './flow-run.service';
 import { ApiOperation, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { Response } from 'express';
 
-@Controller('flow-runs')
+@Controller('runs')
 export class FlowRunController {
     constructor(private readonly flowRunService: FlowRunService) { }
 
