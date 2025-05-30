@@ -11,6 +11,10 @@ export interface Endpoint {
 export class PostProcessor {
     extract?: Record<string, string>;
     assert?: Record<string, string>;
+    delay?: {
+        min: number;
+        max: number;
+    };
 }
 
 export interface ActionNode extends Endpoint {
@@ -23,6 +27,7 @@ export interface WorkerData {
     workerId: number;
     runId: string;
     duration: number;
+    rampUpTime: number;
     nodes: ActionNode[];
     input: Record<string, any>;
 }
@@ -43,22 +48,50 @@ export type WorkerMessage =
         type: "done";
         payload: {
             message: string;
-        }
+            workerId: number;
+            totalRequests: number;
+            totalErrors: number;
+        };
     }
     | {
         type: "info";
         payload: {
             message: string;
-        }
+        };
+    }
+    | {
+        type: "error";
+        payload: {
+            message: string;
+        };
     };
 
 export interface ReportData {
     flowRunId: string;
     ccu: number;
     threads: number;
-    responseTime: number;
+    responseTime: {
+        average: number;
+        max: number;
+        min: number;
+        p90: number;
+        p95: number;
+        p99: number;
+    };
     errorRate: number;
     charts: Array<Buffer>;
     duration: number;
     rps: number;
 }
+
+export class RunnerError extends Error {
+    constructor(
+        message: string,
+        public code?: string,
+        public latency?: number,
+        public status?: number
+    ) {
+        super(message);
+    }
+}
+

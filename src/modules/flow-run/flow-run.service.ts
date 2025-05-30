@@ -5,6 +5,7 @@ import { DRIZZLE } from 'src/database/drizzle.module';
 import { flowLogs, flowRuns } from 'src/database/schema';
 import { ChartService } from './chart.service';
 import { ReportService } from './report.service';
+import { ReportData } from 'src/common/types';
 
 @Injectable()
 export class FlowRunService {
@@ -51,25 +52,55 @@ export class FlowRunService {
             throw new HttpException('No logs found for this flow run', 404);
         }
 
-        const [logStats] = await this.db.select({
-            total: sql<number>`COUNT(*)`,
-            errorCount: sql<number>`SUM(CASE WHEN ${flowLogs.error} THEN 1 ELSE 0 END)`,
-            avgResponseTime: sql<number>`AVG(${flowLogs.responseTime})`
-        }).from(flowLogs).where(eq(flowLogs.runId, id));
+        const [response] = await this.db
+            .select({
+                total: sql<number>`COUNT(*)`,
+                errorCount: sql<number>`SUM(CASE WHEN ${flowLogs.error} THEN 1 ELSE 0 END)`,
+                average: sql<number>`AVG(${flowLogs.responseTime})`,
+                min: sql<number>`MIN(${flowLogs.responseTime})`,
+                max: sql<number>`MAX(${flowLogs.responseTime})`,
+            })
+            .from(flowLogs)
+            .where(eq(flowLogs.runId, id));
 
-        const bucketSizeSec = 5;
+        const responseTimesData = await this.db
+            .select({ responseTime: flowLogs.responseTime })
+            .from(flowLogs)
+            .where(eq(flowLogs.runId, id))
+            .orderBy(asc(flowLogs.responseTime));
+
+        const responseTimes = responseTimesData
+            .map(r => r.responseTime)
+            .filter(rt => rt !== null && rt !== undefined) as number[];
+
+        const calculatePercentile = (arr: number[], percentile: number): number => {
+            if (arr.length === 0) return 0;
+            const index = (percentile / 100) * (arr.length - 1);
+            const lower = Math.floor(index);
+            const upper = Math.ceil(index);
+            const weight = index % 1;
+
+            if (upper >= arr.length) return arr[arr.length - 1];
+            return arr[lower] * (1 - weight) + arr[upper] * weight;
+        };
+
+        const p90 = calculatePercentile(responseTimes, 90);
+        const p95 = calculatePercentile(responseTimes, 95);
+        const p99 = calculatePercentile(responseTimes, 99);
+
+        const responseWithPercentiles = {
+            ...response,
+            p90,
+            p95,
+            p99
+        };
+
         const requestsPerSecond: Record<string, number> = {};
-        const responseTimesPerBucket: Record<string, number[]> = {};
+        const responseTimesPerSecond: Record<string, number[]> = {};
 
         for (const log of logs) {
-            const ms = typeof log.createdAt === 'string'
-                ? new Date(log.createdAt).getTime()
-                : log.createdAt;
-
-            const bucketSec = Math.floor(ms / 1000 / bucketSizeSec) * bucketSizeSec;
-            const bucketMs = bucketSec * 1000;
-
-            const timeLabel = new Date(bucketMs).toLocaleString('en-US', {
+            const secondTimestamp = Math.floor(new Date(log.createdAt).getTime() / 1000) * 1000;
+            const timeLabel = new Date(secondTimestamp).toLocaleString('en-US', {
                 timeZone: 'Asia/Ho_Chi_Minh',
                 hour12: false,
                 hour: '2-digit',
@@ -78,34 +109,30 @@ export class FlowRunService {
             });
 
             requestsPerSecond[timeLabel] = (requestsPerSecond[timeLabel] || 0) + 1;
-
-            if (!responseTimesPerBucket[timeLabel]) responseTimesPerBucket[timeLabel] = [];
-            responseTimesPerBucket[timeLabel].push(log.responseTime ?? 0);
+            if (!responseTimesPerSecond[timeLabel]) responseTimesPerSecond[timeLabel] = [];
+            responseTimesPerSecond[timeLabel].push(log.responseTime ?? 0);
         }
 
-        const avgResponseTimePerBucket: Record<string, number> = {};
-        for (const [key, times] of Object.entries(responseTimesPerBucket)) {
+        const avgResponseTimePerSecond: Record<string, number> = {};
+        for (const [key, times] of Object.entries(responseTimesPerSecond)) {
             const sum = times.reduce((a, b) => a + b, 0);
-            avgResponseTimePerBucket[key] = times.length > 0 ? sum / times.length : 0;
+            avgResponseTimePerSecond[key] = times.length > 0 ? sum / times.length : 0;
         }
-
-        const averageResponseTime = logStats.avgResponseTime ?? 0;
 
         const rpsChart = await this.chartService.createRPSChart(requestsPerSecond);
-        const responseTimeChart = await this.chartService.createResponseTimeChart(avgResponseTimePerBucket);
+        const responseTimeChart = await this.chartService.createResponseTimeChart(avgResponseTimePerSecond);
 
-        const reportData = {
+        const reportData: ReportData = {
             flowRunId: run.id,
             ccu: run.ccu,
             threads: run.threads,
-            responseTime: averageResponseTime,
-            errorRate: (logStats.total ?? 0) > 0 ? (logStats.errorCount ?? 0) / logStats.total * 100 : 0,
+            responseTime: responseWithPercentiles,
+            errorRate: (responseWithPercentiles.total ?? 0) > 0 ? (responseWithPercentiles.errorCount ?? 0) / responseWithPercentiles.total * 100 : 0,
             charts: [rpsChart, responseTimeChart],
             duration: run.duration,
-            rps: (logStats.total ?? 0) / run.duration,
+            rps: (responseWithPercentiles.total ?? 0) / run.duration,
         };
 
         return await this.reportService.generateReport(reportData);
     }
-
 }

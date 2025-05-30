@@ -99,13 +99,17 @@ export class ReportService {
                 const leftMetrics = [
                     { label: 'Concurrent Users', value: data.ccu ?? 'N/A', unit: '' },
                     { label: 'Threads', value: data.threads ?? 'N/A', unit: '' },
-                    { label: 'Duration', value: data.duration?.toFixed(2) ?? 'N/A', unit: ' seconds' }
+                    { label: 'Duration', value: data.duration?.toFixed(2) ?? 'N/A', unit: ' seconds' },
+                    { label: 'Error Rate', value: data.errorRate?.toFixed(2) ?? 'N/A', unit: '%' },
+                    { label: 'Generated', value: new Date().toLocaleString(), unit: '' },
                 ];
 
                 const rightMetrics = [
-                    { label: 'Avg Response Time', value: data.responseTime?.toFixed(2) ?? 'N/A', unit: ' ms' },
-                    { label: 'Error Rate', value: data.errorRate?.toFixed(2) ?? 'N/A', unit: '%' },
-                    { label: 'Generated', value: new Date().toLocaleString(), unit: '' }
+                    { label: 'Avg Response Time', value: data.responseTime.average?.toFixed(2) ?? 'N/A', unit: ' ms' },
+                    { label: 'Max Response Time', value: data.responseTime.max?.toFixed(2) ?? 'N/A', unit: ' ms' },
+                    { label: 'Min Response Time', value: data.responseTime.min?.toFixed(2) ?? 'N/A', unit: ' ms' },
+                    { label: 'P90 Response Time', value: data.responseTime.p90?.toFixed(2) ?? 'N/A', unit: ' ms' },
+                    { label: 'P99 Response Time', value: data.responseTime.p99?.toFixed(2) ?? 'N/A', unit: ' ms' },
                 ];
 
                 // Vẽ cột trái

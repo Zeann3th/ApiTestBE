@@ -66,4 +66,16 @@ export class EndpointController {
   async deleteAll() {
     return await this.endpointService.deleteAll();
   }
+
+  @ApiOperation({ summary: 'Run endpoint by id' })
+  @ApiParam({ name: 'id', required: true, type: String })
+  @ApiBody({ description: 'Data to run the endpoint', type: Object })
+  @HttpCode(200)
+  @Post(':id/run')
+  async run(
+    @Param('id') id: string,
+    @Body() data: Record<string, any>
+  ) {
+    return await this.endpointService.run(id, data);
+  }
 }

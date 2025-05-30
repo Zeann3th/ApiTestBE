@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import axios, { AxiosError, AxiosInstance } from 'axios';
+import axios, { AxiosInstance, InternalAxiosRequestConfig } from 'axios';
 import { Endpoint, ActionNode } from 'src/common/types';
 import * as http from 'http';
 import * as https from 'https';
@@ -7,58 +7,72 @@ import * as https from 'https';
 @Injectable()
 export class RunnerService {
   private readonly axiosInstance: AxiosInstance;
+  private readonly REQUEST_TIMEOUT = 30000;
+  private readonly SOCKET_TIMEOUT = 30000;
+  private readonly MAX_SOCKETS = 200;
+  private readonly MAX_FREE_SOCKETS = 50;
+
 
   constructor() {
-    const httpAgent = new http.Agent({
+    const agentConfig = {
       keepAlive: true,
-      maxSockets: Infinity,
-      maxFreeSockets: Infinity,
-      timeout: 30000,
-      scheduling: 'fifo'
-    });
+      maxSockets: this.MAX_SOCKETS,
+      maxFreeSockets: this.MAX_FREE_SOCKETS,
+      timeout: this.SOCKET_TIMEOUT,
+      scheduling: 'fifo' as const
+    };
 
-    const httpsAgent = new https.Agent({
-      keepAlive: true,
-      maxSockets: Infinity,
-      maxFreeSockets: Infinity,
-      timeout: 30000,
-      scheduling: 'fifo'
-    });
+    const httpAgent = new http.Agent(agentConfig);
+    const httpsAgent = new https.Agent(agentConfig);
 
     this.axiosInstance = axios.create({
-      timeout: 30000,
+      timeout: this.REQUEST_TIMEOUT,
       httpAgent,
       httpsAgent,
       headers: {
         'Connection': 'keep-alive',
-        'User-Agent': 'FlowTest/1.0'
+        'User-Agent': 'FlowTest/1.0',
+        'Cache-Control': 'no-cache',
+        'Accept-Encoding': 'gzip, deflate, br',
       },
       validateStatus: (status) => status >= 200 && status < 300,
-      maxRedirects: 5,
+      decompress: true,
     });
+
+    this.axiosInstance.interceptors.request.use((config: InternalAxiosRequestConfig) => {
+      config.startTime = Date.now();
+      return config;
+    });
+
+    this.axiosInstance.interceptors.response.use(
+      (response) => {
+        const startTime = Number(response.config.startTime);
+        response['latency'] = Date.now() - startTime;
+        return response;
+      }
+    );
   }
 
   async run(node: ActionNode, data: Record<string, any> = {}, abortSignal?: AbortSignal): Promise<{ data: Record<string, any>, response: any }> {
-    if (!node) {
-      throw new Error('Endpoint is not defined');
-    }
+    if (!node) throw new Error('Endpoint is not defined');
 
     const request = this.interpolate(node, data);
 
-    try {
-      const response = await this.axiosInstance({
-        method: request.method,
-        url: request.url,
-        headers: {
-          ...request.headers,
-          'Content-Type': 'application/json',
-        },
-        params: request.parameters,
-        data: request.body || {},
-        signal: abortSignal,
-      });
+    const response = await this.axiosInstance({
+      method: request.method,
+      url: request.url,
+      headers: {
+        ...request.headers,
+        'Content-Type': 'application/json',
+      },
+      params: request.parameters,
+      data: request.body || {},
+      signal: abortSignal ?? AbortSignal.timeout(this.REQUEST_TIMEOUT),
+    });
 
-      const postProcessors = node.postProcessor;
+    const postProcessors = node.postProcessor;
+
+    if (postProcessors) {
       if (postProcessors?.extract) {
         for (const [key, path] of Object.entries(postProcessors.extract)) {
           const value = this.resolvePath(response?.data, path);
@@ -68,67 +82,29 @@ export class RunnerService {
         }
       }
 
-      console.log(data);
-
-      return { data, response };
-    } catch (error) {
-      if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
-        throw new Error('Request aborted due to timeout');
+      if (postProcessors?.delay) {
+        const { min, max } = postProcessors.delay;
+        const randomMs = min + Math.floor(Math.random() * (max - min + 1));
+        await new Promise(resolve => setTimeout(resolve, randomMs));
       }
-
-      const err = error as AxiosError;
-      const endpointName = node.name || 'Unknown endpoint';
-
-      const errorDetails = [
-        `Error in step "${endpointName}": ${err.message}`,
-        `Code: ${err.code}`,
-        err.response ? `Status: ${err.response.status}` : '',
-        err.response?.data ? `Response: ${JSON.stringify(err.response.data)}` : '',
-        `Timeout: ${err.code === 'ECONNABORTED' ? 'YES' : 'NO'}`,
-        `Request: ${JSON.stringify({
-          method: request.method,
-          url: request.url,
-          headers: request.headers,
-          params: request.parameters,
-          data: request.body,
-        }, null, 2)}`
-      ].filter(Boolean).join('\n');
-
-      throw new Error(errorDetails);
     }
-  }
 
-  getConnectionStats() {
-    return {
-      httpAgent: {
-        // @ts-ignore - accessing private properties for debugging
-        sockets: Object.keys(this.axiosInstance.defaults.httpAgent.sockets || {}).length,
-        freeSockets: Object.keys(this.axiosInstance.defaults.httpAgent.freeSockets || {}).length,
-      },
-      httpsAgent: {
-        // @ts-ignore
-        sockets: Object.keys(this.axiosInstance.defaults.httpsAgent.sockets || {}).length,
-        freeSockets: Object.keys(this.axiosInstance.defaults.httpsAgent.freeSockets || {}).length,
-      }
-    };
+    const { status, headers, data: body } = response;
+    return { data, response: { status, headers, body, latency: response['latency'] } };
   }
 
   private resolvePath(obj: any, path: string): any {
-    const parts = path
-      .replace(/\[(\w+)\]/g, '.$1')
-      .split('.');
-
+    const parts = path.replace(/\[(\w+)\]/g, '.$1').split('.');
     return parts.reduce((acc, key) => (acc != null ? acc[key] : undefined), obj);
   }
 
   private interpolate(template: Endpoint, data: Record<string, any>): Endpoint {
-    const interpolateString = (str: string): string => {
-      return str.replace(/\{\{(.*?)\}\}/g, (_, key) => {
+    const interpolateString = (str: string): string =>
+      str.replace(/\{\{(.*?)\}\}/g, (_, key) => {
         const keys = key.trim().split('.');
         const val = keys.reduce((acc: any, k: string) => acc?.[k], data);
         return val !== undefined ? String(val) : '';
       });
-    };
 
     return {
       ...template,

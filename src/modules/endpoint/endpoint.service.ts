@@ -4,12 +4,15 @@ import { DRIZZLE } from 'src/database/drizzle.module';
 import { endpoints } from 'src/database/schema';
 import { DrizzleDB } from 'src/common/types/drizzle';
 import { ParserService } from '../parser/parser.service';
+import { RunnerService } from '../runner/runner.service';
+import { ActionNode, Endpoint } from 'src/common/types';
 
 @Injectable()
 export class EndpointService {
   constructor(
     @Inject(DRIZZLE) private readonly db: DrizzleDB,
-    private readonly parserService: ParserService
+    private readonly parserService: ParserService,
+    private readonly runnerService: RunnerService
   ) { }
 
   async getAll(page: number, limit: number) {
@@ -90,6 +93,18 @@ export class EndpointService {
     return {
       total,
       data: endpointList
+    }
+  }
+
+  async run(id: string, data: Record<string, any>) {
+    const endpoint = (await this.getById(id)) as ActionNode;
+
+    try {
+      const { response } = await this.runnerService.run(endpoint, data);
+      return response;
+    } catch (error) {
+      console.error('Error running endpoint:', error);
+      throw new HttpException('Failed to run endpoint', 500);
     }
   }
 }

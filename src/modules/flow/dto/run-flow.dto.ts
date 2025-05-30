@@ -15,11 +15,17 @@ export class RunFlowDto {
     @IsNotEmpty()
     threads: number;
 
-    @ApiProperty({ type: "integer", description: "Duration in seconds", example: 60 })
-    @Min(1)
+    @ApiProperty({ type: "integer", description: "Duration in seconds", example: 200 })
+    @Min(30)
     @IsInt()
     @IsNotEmpty()
     duration: number;
+
+    @ApiProperty({ type: "integer", description: "Ramp Up Time in seconds", example: 40 })
+    @Min(0)
+    @IsInt()
+    @IsNotEmpty()
+    rampUpTime: number;
 
     @ApiProperty({ description: "Additional input for flow", example: { "baseUrl": "http:/localhost:7554" } })
     @IsOptional()

@@ -1,175 +1,204 @@
 import { parentPort, workerData } from "worker_threads";
 import { RunnerService } from "../runner/runner.service";
 
-const { ccu, workerId, duration, nodes, input, runId } = workerData;
-const runner = new RunnerService();
-const endTime = Date.now() + duration * 1000;
-let stopped = false;
-const abortController = new AbortController();
+// Khởi tạo
+const { ccu, workerId, duration, rampUpTime, nodes, input, runId } = workerData;
 
+const runner = new RunnerService();
+const startTime = Date.now();
+const endTime = startTime + duration * 1000;
+const abortController = new AbortController();
+let stopped = false;
+let activeUsers = 0;
+let totalRequests = 0;
+let totalErrors = 0;
+
+/**
+ * Hàm tạo độ trễ cơ bản
+ * @param ms Thời gian trễ (ms)
+ */
 const delay = (ms: number) => new Promise((res) => setTimeout(res, ms));
 
-const randomDelay = (base: number, variance: number) =>
-    base + Math.floor(Math.random() * variance);
+/**
+ * Hàm tạo độ trễ ngẫu nhiên
+ * @param base Thời gian cơ bản (ms)
+ * @param variance Biến thể (ms) để tạo độ trễ ngẫu nhiên
+ */
+const randomDelay = async (base: number, variance: number) =>
+    await delay(base + Math.floor(Math.random() * variance));
 
-async function spawnUser(userId: number) {
-    const startDelay = randomDelay(userId * 50, 100);
-    await delay(startDelay);
+/**
+ * Thông báo tiến độ, thông tin về hoạt động của worker
+ */
+const startProgressReporting = () => {
+    const progressInterval = setInterval(() => {
+        if (stopped) {
+            clearInterval(progressInterval);
+            return;
+        }
 
-    let requestCount = 0;
-    let errorCount = 0;
+        const timeRemaining = Math.max(0, Math.ceil((endTime - Date.now()) / 1000));
 
-    while (!stopped && Date.now() < endTime) {
-        let data = structuredClone(input);
+        parentPort?.postMessage({
+            type: "info",
+            payload: {
+                message: `[Worker ${workerId}] Progress: ${activeUsers} active users, ${timeRemaining}s remaining, ${totalRequests} requests, ${totalErrors} errors`
+            }
+        });
+    }, 10000);
 
-        for (const node of nodes) {
-            if (stopped || Date.now() >= endTime) break;
+    return progressInterval;
+};
 
-            try {
-                const start = performance.now();
-                data = (await runner.run(node, data, abortController.signal)).data;
-                const latency = performance.now() - start;
+/**
+ * Mô phỏng người dùng
+ */
+const spawnUser = async (): Promise<void> => {
+    activeUsers++;
+    let data = JSON.parse(JSON.stringify(input));
 
-                if (stopped || Date.now() >= endTime) break;
+    try {
+        while (!stopped && Date.now() < endTime) {
+            for (const node of nodes) {
+                if (stopped || Date.now() >= endTime || abortController.signal.aborted) break;
 
-                requestCount++;
+                let statusCode: number = 500;
+                let responseTime: number = 0;
+                let error: any = null;
+                let hasError = false;
 
-                parentPort?.postMessage({
-                    type: "log",
-                    payload: {
-                        runId,
-                        endpointId: node.id,
-                        statusCode: 200,
-                        responseTime: latency,
-                        error: null,
-                    },
-                });
+                try {
+                    const { data: runnerData, response } = await runner.run(
+                        node,
+                        data,
+                        abortController.signal
+                    );
+                    data = runnerData;
+                    statusCode = response.status;
+                    responseTime = response.latency;
 
-                if (latency > 5000) {
-                    parentPort?.postMessage({
-                        type: "info",
-                        payload: {
-                            message: `[Worker ${workerId}] Slow request: ${latency}ms to ${node.name || node.url}`
-                        }
-                    });
-                }
-
-            } catch (err) {
-                if (stopped || Date.now() >= endTime) break;
-
-                errorCount++;
-                const error = err as Error;
-
-                parentPort?.postMessage({
-                    type: "log",
-                    payload: {
-                        runId,
-                        endpointId: node.id,
-                        statusCode: error.message.includes('Status:') ?
-                            parseInt(error.message.match(/Status: (\d+)/)?.[1] || '500') : 500,
-                        responseTime: 0,
-                        error: error.message,
-                    },
-                });
-
-                parentPort?.postMessage({
-                    type: "info",
-                    payload: {
-                        message: `[Worker ${workerId}] Error: ${error.message}`
+                    if (statusCode >= 400) {
+                        hasError = true;
+                        totalErrors++;
                     }
-                });
 
-                if (errorCount > 5) {
-                    const delayTime = randomDelay(1000, 2000);
-                    const delayStart = Date.now();
-                    while (Date.now() - delayStart < delayTime && !stopped && Date.now() < endTime) {
-                        await delay(Math.min(100, delayTime - (Date.now() - delayStart)));
+                    totalRequests++;
+                } catch (err: any) {
+                    if (err.name === 'AbortError' || abortController.signal.aborted) break;
+
+                    error = err;
+                    hasError = true;
+                    totalErrors++;
+                    totalRequests++;
+                } finally {
+                    if (!abortController.signal.aborted) {
+                        const message = {
+                            type: "log",
+                            payload: {
+                                runId,
+                                endpointId: node.id,
+                                statusCode,
+                                responseTime,
+                                error: hasError ? (error ? error.message : `HTTP ${statusCode}`) : null,
+                                createdAt: new Date().toISOString(),
+                            }
+                        };
+                        parentPort?.postMessage(message);
                     }
-                    errorCount = 0;
                 }
             }
-        }
 
-        if (stopped || Date.now() >= endTime) break;
+            if (!stopped && !abortController.signal.aborted && Date.now() < endTime) {
+                await randomDelay(500, 1000);
+            }
 
-        const delayTime = randomDelay(90, 40);
-        const delayStart = Date.now();
-        while (Date.now() - delayStart < delayTime && !stopped && Date.now() < endTime) {
-            await delay(Math.min(50, delayTime - (Date.now() - delayStart)));
+            if (stopped || Date.now() >= endTime || abortController.signal.aborted) break;
         }
+    } catch (err: any) {
+        parentPort?.postMessage({
+            type: "info",
+            payload: { message: `[Worker ${workerId}] User session ended: ${err.message}` }
+        });
+    } finally {
+        activeUsers--;
     }
-
-    parentPort?.postMessage({
-        type: "info",
-        payload: {
-            message: `[Worker ${workerId}] User ${userId} completed ${requestCount} requests with ${errorCount} errors`
-        }
-    });
 }
 
-async function run() {
+/**
+ * Luồng họat động chính
+ */
+const run = async (): Promise<void> => {
     parentPort?.postMessage({
         type: "info",
         payload: { message: `[Worker ${workerId}] Starting ${ccu} concurrent users for ${duration}s` }
     });
 
+    const progressInterval = startProgressReporting();
+
     const users: Promise<void>[] = [];
 
+    // Tạo người dùng với độ trễ ramp-up, tránh overload server
     for (let i = 0; i < ccu; i++) {
-        users.push(spawnUser(i));
-
-        if (i > 0 && i % 10 === 0) {
-            await delay(50);
-        }
+        const delayTime = Math.floor((i / ccu) * rampUpTime * 1000);
+        users.push(
+            delay(delayTime)
+                .then(() => spawnUser())
+                .catch((err: any) => {
+                    parentPort?.postMessage({
+                        type: "info",
+                        payload: { message: `[Worker ${workerId}] User ${i + 1} failed: ${err.message}` }
+                    });
+                })
+        );
     }
 
     const timeoutPromise = new Promise<void>((resolve) => {
         setTimeout(() => {
             stopped = true;
+            parentPort?.postMessage({
+                type: "info",
+                payload: { message: `[Worker ${workerId}] Duration timeout reached (${duration}s). Stopping users...` }
+            });
             resolve();
         }, duration * 1000);
     });
 
-    await Promise.race([
-        Promise.all(users),
-        timeoutPromise
-    ]);
+    await timeoutPromise;
+
+    parentPort?.postMessage({
+        type: "info",
+        payload: { message: `[Worker ${workerId}] Timeout reached. Aborting all requests and cleaning up...` }
+    });
 
     abortController.abort();
 
-    await delay(100);
+    clearInterval(progressInterval);
+
+    await Promise.allSettled(users);
+
+    await delay(1000);
 
     parentPort?.postMessage({
         type: "done",
-        payload: { message: `[Run ${runId}] Worker ${workerId} stopped after ${duration}s` }
+        payload: {
+            message: `[Worker ${workerId}] Completed. Total requests: ${totalRequests}, Errors: ${totalErrors}`,
+            workerId,
+            totalRequests,
+            totalErrors
+        }
     });
 
-    process.exit(0);
+    setTimeout(() => {
+        process.exit(0);
+    }, 100);
 }
 
-const statsInterval = setInterval(() => {
-    if (!stopped) {
-        try {
-            const stats = runner.getConnectionStats();
-            parentPort?.postMessage({
-                type: "info",
-                payload: {
-                    message: `[Worker ${workerId}] Connection stats: HTTP sockets: ${stats.httpAgent.sockets}, HTTPS sockets: ${stats.httpsAgent.sockets}`
-                }
-            });
-        } catch (e) {
-        }
-    } else {
-        clearInterval(statsInterval);
-    }
-}, 10000);
-
-run().catch((err) => {
-    parentPort?.postMessage({
-        type: "error",
-        payload: {
-            message: `[Run ${runId}] Worker ${workerId} crashed: ${err.message}`,
-        },
+run()
+    .then(() => process.exit(0))
+    .catch((err: any) => {
+        parentPort?.postMessage({
+            type: "info",
+            payload: { message: `[Worker ${workerId}] Worker crashed: ${err.message}` }
+        });
+        process.exit(1);
     });
-    process.exit(1);
-});

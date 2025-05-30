@@ -3,7 +3,7 @@ import { DRIZZLE } from 'src/database/drizzle.module';
 import { DrizzleDB } from 'src/common/types/drizzle';
 import { CreateFlowDto } from './dto/create-flow.dto';
 import { endpoints, flowLogs, flowRuns, flows, flowSteps } from 'src/database/schema';
-import { and, asc, count, eq, inArray } from 'drizzle-orm';
+import { and, asc, count, eq, sql } from 'drizzle-orm';
 import { UpdateFlowDto } from './dto/update-flow.dto';
 import { RunFlowDto } from './dto/run-flow.dto';
 import { Worker } from 'worker_threads';
@@ -75,7 +75,6 @@ export class FlowService {
   async update(id: string, { name, description, sequence }: UpdateFlowDto) {
     await this.getById(id);
     let flow: any;
-
     try {
       await this.db.transaction(async (tx) => {
         if (name || description) {
@@ -89,16 +88,29 @@ export class FlowService {
         }
 
         if (sequence) {
+          const existingSteps = await tx.select({
+            endpointId: flowSteps.endpointId,
+            postProcessor: flowSteps.postProcessor,
+            sequence: flowSteps.sequence
+          })
+            .from(flowSteps)
+            .where(eq(flowSteps.flowId, id));
+
+          const postProcessorMap = new Map(
+            existingSteps.map(step => [step.endpointId, step.postProcessor])
+          );
+
+          await tx.delete(flowSteps)
+            .where(eq(flowSteps.flowId, id));
+
           const flowStepValues = sequence.map((endpointId, index) => ({
             flowId: id,
             endpointId,
-            sequence: index + 1
+            sequence: index + 1,
+            postProcessor: postProcessorMap.get(endpointId) || null
           }));
 
-          await tx.insert(flowSteps).values(flowStepValues).onConflictDoUpdate({
-            target: [flowSteps.flowId, flowSteps.sequence],
-            set: { endpointId: flowSteps.endpointId }
-          });
+          await tx.insert(flowSteps).values(flowStepValues);
         }
       });
       return { ...flow, sequence };
@@ -140,9 +152,8 @@ export class FlowService {
     return { message: "Flow updated successfully" };
   }
 
-  async run(id: string, runId: string, { ccu, threads, duration, input }: RunFlowDto) {
+  async run(id: string, runId: string, { ccu, threads, duration, input, rampUpTime }: RunFlowDto) {
     await this.getById(id);
-
     const steps = await this.db.select().from(flowSteps)
       .where(eq(flowSteps.flowId, id))
       .leftJoin(endpoints, eq(flowSteps.endpointId, endpoints.id))
@@ -167,31 +178,34 @@ export class FlowService {
 
     try {
       const workerPromises: Promise<void>[] = [];
-
       const base = Math.floor(ccu / threads);
       const remainder = ccu % threads;
 
       for (let i = 1; i <= threads; i++) {
         const assignedCCU = base + (i <= remainder ? 1 : 0);
-
         const workerData = {
           workerId: i,
           runId: flowRun.id,
           ccu: assignedCCU,
+          rampUpTime,
           duration,
           nodes,
           input
         } as WorkerData;
 
-        workerPromises.push(this.createWorker(path.join(__dirname, 'flow.worker.js'), workerData));
+        workerPromises.push(
+          this.createWorker(path.join(__dirname, 'flow.worker.js'), workerData)
+        );
       }
 
       await Promise.allSettled(workerPromises);
+
       await this.db.update(flowRuns)
         .set({ status: "COMPLETED", updatedAt: new Date().toISOString() })
         .where(eq(flowRuns.id, flowRun.id));
+
     } catch (error) {
-      console.error(error);
+      console.error(`[Run ${runId}] Error:`, error);
       throw new HttpException("Internal Server Error", 500);
     }
   }
@@ -202,22 +216,29 @@ export class FlowService {
 
       worker.on("message", async (message: WorkerMessage) => {
         if (message.type === "log") {
-          await this.db.insert(flowLogs).values(message.payload);
+          try {
+            await this.db.insert(flowLogs).values(message.payload);
+          } catch (error) {
+            console.error(`[Worker ${workerData.workerId}] Error inserting log:`, error);
+          }
         } else if (message.type === "done") {
-          console.log(message.payload);
+          console.log(`[Worker ${message.payload.workerId}] ${message.payload.message}`);
           resolve();
         } else if (message.type === "info") {
-          // console.log(message.payload);
+          console.log(message.payload.message);
+        } else if (message.type === "error") {
+          console.error(message.payload.message);
         }
       });
 
       worker.on("error", (error) => {
-        console.error("Worker error", error);
+        console.error(`[Worker ${workerData.workerId}] Worker error:`, error);
         reject(error);
       });
 
       worker.on("exit", (code) => {
         if (code !== 0) {
+          console.error(`[Worker ${workerData.workerId}] Worker stopped with exit code ${code}`);
           reject(new Error(`Worker stopped with exit code ${code}`));
         }
       });
