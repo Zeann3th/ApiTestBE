@@ -75,7 +75,6 @@ export class FlowService {
   async update(id: string, { name, description, sequence }: UpdateFlowDto) {
     await this.getById(id);
     let flow: any;
-
     try {
       await this.db.transaction(async (tx) => {
         if (name || description) {
@@ -89,16 +88,29 @@ export class FlowService {
         }
 
         if (sequence) {
+          const existingSteps = await tx.select({
+            endpointId: flowSteps.endpointId,
+            postProcessor: flowSteps.postProcessor,
+            sequence: flowSteps.sequence
+          })
+            .from(flowSteps)
+            .where(eq(flowSteps.flowId, id));
+
+          const postProcessorMap = new Map(
+            existingSteps.map(step => [step.endpointId, step.postProcessor])
+          );
+
+          await tx.delete(flowSteps)
+            .where(eq(flowSteps.flowId, id));
+
           const flowStepValues = sequence.map((endpointId, index) => ({
             flowId: id,
             endpointId,
-            sequence: index + 1
+            sequence: index + 1,
+            postProcessor: postProcessorMap.get(endpointId) || null
           }));
 
-          await tx.insert(flowSteps).values(flowStepValues).onConflictDoUpdate({
-            target: [flowSteps.flowId, flowSteps.sequence],
-            set: { endpointId: flowSteps.endpointId }
-          });
+          await tx.insert(flowSteps).values(flowStepValues);
         }
       });
       return { ...flow, sequence };

@@ -24,7 +24,7 @@ COPY --from=build /app/dist ./dist
 
 ENV NODE_ENV=production
 
-EXPOSE 8080
+EXPOSE 31347
 
 CMD ["node", "dist/src/main.js"]
 
