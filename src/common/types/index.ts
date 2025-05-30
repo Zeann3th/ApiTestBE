@@ -11,7 +11,10 @@ export interface Endpoint {
 export class PostProcessor {
     extract?: Record<string, string>;
     assert?: Record<string, string>;
-    delay?: number;
+    delay?: {
+        min: number;
+        max: number;
+    };
 }
 
 export interface ActionNode extends Endpoint {

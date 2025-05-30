@@ -109,7 +109,7 @@ const spawnUser = async (): Promise<void> => {
             }
 
             if (!stopped && !abortController.signal.aborted && Date.now() < endTime) {
-                await randomDelay(3000, 4000);
+                await randomDelay(500, 1000);
             }
 
             if (stopped || Date.now() >= endTime || abortController.signal.aborted) break;

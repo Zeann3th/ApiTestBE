@@ -83,7 +83,9 @@ export class RunnerService {
       }
 
       if (postProcessors?.delay) {
-        await new Promise(resolve => setTimeout(resolve, postProcessors.delay));
+        const { min, max } = postProcessors.delay;
+        const randomMs = min + Math.floor(Math.random() * (max - min + 1));
+        await new Promise(resolve => setTimeout(resolve, randomMs));
       }
     }
 
