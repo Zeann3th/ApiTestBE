@@ -7,6 +7,8 @@ import { migrate } from "drizzle-orm/libsql/migrator";
 import * as path from "path";
 import * as fs from "fs";
 import * as url from "url";
+import * as keytar from "keytar";
+import * as crypto from "crypto";
 
 export const DRIZZLE = Symbol("Drizzle Connection");
 
@@ -36,8 +38,15 @@ export const DRIZZLE = Symbol("Drizzle Connection");
           }
         }
 
+        let encryptionKey = await keytar.getPassword(env.APP_NAME, "default");
+        if (!encryptionKey) {
+          encryptionKey = crypto.randomBytes(64).toString("hex");
+          await keytar.setPassword(env.APP_NAME, "default", encryptionKey);
+        }
+
         const client = createClient({
           url: env.DATABASE_URL,
+          encryptionKey
         });
 
         const db = drizzle(client, { schema }) as LibSQLDatabase<typeof schema>;
