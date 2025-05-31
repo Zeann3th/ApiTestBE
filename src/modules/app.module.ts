@@ -8,6 +8,7 @@ import { FlowModule } from './flow/flow.module';
 import { ParserModule } from './parser/parser.module';
 import { RunnerModule } from './runner/runner.module';
 import { FlowRunModule } from './flow-run/flow-run.module';
+import { GatewayModule } from './gateway/gateway.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { FlowRunModule } from './flow-run/flow-run.module';
     ParserModule,
     RunnerModule,
     FlowRunModule,
+    GatewayModule,
   ],
   providers: [
     {
