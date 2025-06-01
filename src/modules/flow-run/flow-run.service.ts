@@ -55,7 +55,14 @@ export class FlowRunService {
         const [response] = await this.db
             .select({
                 total: sql<number>`COUNT(*)`,
-                errorCount: sql<number>`SUM(CASE WHEN ${flowLogs.error} THEN 1 ELSE 0 END)`,
+                errorCount: sql<number>`
+  SUM(
+    CASE 
+      WHEN ${flowLogs.error} = true OR ${flowLogs.statusCode} >= 400 THEN 1 
+      ELSE 0 
+    END
+  )
+`,
                 average: sql<number>`AVG(${flowLogs.responseTime})`,
                 min: sql<number>`MIN(${flowLogs.responseTime})`,
                 max: sql<number>`MAX(${flowLogs.responseTime})`,
