@@ -21,8 +21,10 @@
     "@nestjs/config": "^4.0.1",
     "@nestjs/core": "^11.0.1",
     "@nestjs/platform-express": "^11.0.1",
+    "@nestjs/platform-socket.io": "^11.1.2",
     "@nestjs/swagger": "^11.0.6",
     "@nestjs/throttler": "^6.4.0",
+    "@nestjs/websockets": "^11.1.2",
     "axios": "^1.9.0",
     "chart.js": "^4.4.9",
     "chartjs-node-canvas": "^5.0.0",
@@ -33,11 +35,13 @@
     "dotenv": "^16.4.7",
     "drizzle-orm": "^0.40.0",
     "helmet": "^8.0.0",
+    "http-cookie-agent": "^7.0.1",
     "keytar": "^7.9.0",
     "morgan": "^1.10.0",
     "pdfkit": "^0.17.1",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
+    "tough-cookie": "^5.1.2",
     "zod": "^3.24.2"
   },
   "devDependencies": {
@@ -72,7 +76,8 @@
       "node_modules/drizzle-orm/libsql/**/*",
       "node_modules/@libsql/**/*",
       "node_modules/pdfkit/js/data/Helvetica.afm",
-      "node_modules/pdfkit/js/data/Helvetica-Bold.afm"
+      "node_modules/pdfkit/js/data/Helvetica-Bold.afm",
+      "node_modules/http-cookie-agent/**/*"
     ],
     "targets": [
       "node22-win-x64"

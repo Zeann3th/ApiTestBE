@@ -3,17 +3,21 @@ import { DRIZZLE } from 'src/database/drizzle.module';
 import { DrizzleDB } from 'src/common/types/drizzle';
 import { CreateFlowDto } from './dto/create-flow.dto';
 import { endpoints, flowLogs, flowRuns, flows, flowSteps } from 'src/database/schema';
-import { and, asc, count, eq, sql } from 'drizzle-orm';
+import { and, asc, count, eq } from 'drizzle-orm';
 import { UpdateFlowDto } from './dto/update-flow.dto';
 import { RunFlowDto } from './dto/run-flow.dto';
 import { Worker } from 'worker_threads';
 import { FlowProcessorDto } from './dto/flow-processor.dto';
 import path from 'path';
 import { ActionNode, WorkerData, WorkerMessage } from 'src/common/types';
+import { GatewayService } from '../gateway/gateway.service';
 
 @Injectable()
 export class FlowService {
-  constructor(@Inject(DRIZZLE) private readonly db: DrizzleDB) { }
+  constructor(
+    @Inject(DRIZZLE) private readonly db: DrizzleDB,
+    private readonly gatewayService: GatewayService
+  ) { }
 
   async getAll(page: number, limit: number) {
     const [[{ total }], flowList] = await Promise.all([
@@ -218,11 +222,13 @@ export class FlowService {
         if (message.type === "log") {
           try {
             await this.db.insert(flowLogs).values(message.payload);
+            this.gatewayService.emitLog(workerData.runId, message.payload);
           } catch (error) {
             console.error(`[Worker ${workerData.workerId}] Error inserting log:`, error);
           }
         } else if (message.type === "done") {
           console.log(`[Worker ${message.payload.workerId}] ${message.payload.message}`);
+          this.gatewayService.emitDone(workerData.runId, message.payload.message);
           resolve();
         } else if (message.type === "info") {
           console.log(message.payload.message);

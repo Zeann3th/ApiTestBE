@@ -1,41 +1,28 @@
 import { Injectable } from '@nestjs/common';
 import axios, { AxiosInstance, InternalAxiosRequestConfig } from 'axios';
 import { Endpoint, ActionNode } from 'src/common/types';
-import * as http from 'http';
-import * as https from 'https';
+import { CookieJar } from 'tough-cookie';
+import { HttpCookieAgent, HttpsCookieAgent } from 'http-cookie-agent/http';
 
 @Injectable()
 export class RunnerService {
   private readonly axiosInstance: AxiosInstance;
   private readonly REQUEST_TIMEOUT = 30000;
-  private readonly SOCKET_TIMEOUT = 30000;
-  private readonly MAX_SOCKETS = 200;
-  private readonly MAX_FREE_SOCKETS = 50;
-
 
   constructor() {
-    const agentConfig = {
-      keepAlive: true,
-      maxSockets: this.MAX_SOCKETS,
-      maxFreeSockets: this.MAX_FREE_SOCKETS,
-      timeout: this.SOCKET_TIMEOUT,
-      scheduling: 'fifo' as const
-    };
-
-    const httpAgent = new http.Agent(agentConfig);
-    const httpsAgent = new https.Agent(agentConfig);
-
+    const cookieJar = new CookieJar();
     this.axiosInstance = axios.create({
+      httpAgent: new HttpCookieAgent({ cookies: { jar: cookieJar } }),
+      httpsAgent: new HttpsCookieAgent({ cookies: { jar: cookieJar } }),
+      withCredentials: true,
       timeout: this.REQUEST_TIMEOUT,
-      httpAgent,
-      httpsAgent,
       headers: {
         'Connection': 'keep-alive',
         'User-Agent': 'FlowTest/1.0',
         'Cache-Control': 'no-cache',
         'Accept-Encoding': 'gzip, deflate, br',
       },
-      validateStatus: (status) => status >= 200 && status < 300,
+      validateStatus: () => true,
       decompress: true,
     });
 
