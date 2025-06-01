@@ -4,7 +4,6 @@ import { RunnerService } from "../runner/runner.service";
 // Khởi tạo
 const { ccu, workerId, duration, rampUpTime, nodes, input, runId } = workerData;
 
-const runner = new RunnerService();
 const startTime = Date.now();
 const endTime = startTime + duration * 1000;
 const abortController = new AbortController();
@@ -55,6 +54,9 @@ const startProgressReporting = () => {
  */
 const spawnUser = async (): Promise<void> => {
     activeUsers++;
+    // Mỗi người dùng ảo sẽ có runner riêng để tránh xung đột cookies và trạng thái
+    const runner = new RunnerService();
+
     let data = JSON.parse(JSON.stringify(input));
 
     try {

@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import axios, { AxiosInstance, InternalAxiosRequestConfig } from 'axios';
 import { Endpoint, ActionNode } from 'src/common/types';
+import { CookieJar } from 'tough-cookie';
+import { HttpCookieAgent, HttpsCookieAgent } from 'http-cookie-agent/http';
 
 @Injectable()
 export class RunnerService {
@@ -8,8 +10,11 @@ export class RunnerService {
   private readonly REQUEST_TIMEOUT = 30000;
 
   constructor() {
-
+    const cookieJar = new CookieJar();
     this.axiosInstance = axios.create({
+      httpAgent: new HttpCookieAgent({ cookies: { jar: cookieJar } }),
+      httpsAgent: new HttpsCookieAgent({ cookies: { jar: cookieJar } }),
+      withCredentials: true,
       timeout: this.REQUEST_TIMEOUT,
       headers: {
         'Connection': 'keep-alive',
