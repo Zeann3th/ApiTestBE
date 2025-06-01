@@ -1,8 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import axios, { AxiosInstance, InternalAxiosRequestConfig } from 'axios';
 import { Endpoint, ActionNode } from 'src/common/types';
-import * as tough from 'tough-cookie';
-import { wrapper } from 'axios-cookiejar-support';
 
 @Injectable()
 export class RunnerService {
@@ -11,7 +9,7 @@ export class RunnerService {
 
   constructor() {
 
-    const instance = axios.create({
+    this.axiosInstance = axios.create({
       timeout: this.REQUEST_TIMEOUT,
       headers: {
         'Connection': 'keep-alive',
@@ -22,8 +20,6 @@ export class RunnerService {
       validateStatus: () => true,
       decompress: true,
     });
-
-    this.axiosInstance = wrapper(instance)
 
     this.axiosInstance.interceptors.request.use((config: InternalAxiosRequestConfig) => {
       config.startTime = Date.now();
