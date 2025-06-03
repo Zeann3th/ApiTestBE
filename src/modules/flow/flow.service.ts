@@ -9,7 +9,7 @@ import { RunFlowDto } from './dto/run-flow.dto';
 import { Worker } from 'worker_threads';
 import { FlowProcessorDto } from './dto/flow-processor.dto';
 import path from 'path';
-import { ActionNode, WorkerData, WorkerMessage } from 'src/common/types';
+import { ActionNode, UserCredentials, WorkerData, WorkerMessage } from 'src/common/types';
 import { GatewayService } from '../gateway/gateway.service';
 
 @Injectable()
@@ -158,43 +158,31 @@ export class FlowService {
 
   async run(id: string, runId: string, { ccu, threads, duration, input, rampUpTime }: RunFlowDto) {
     await this.getById(id);
-    const steps = await this.db.select().from(flowSteps)
-      .where(eq(flowSteps.flowId, id))
-      .leftJoin(endpoints, eq(flowSteps.endpointId, endpoints.id))
-      .orderBy(flowSteps.sequence);
 
-    if (steps.length === 0) {
-      throw new HttpException(`Flow ${id} does not have any steps`, 400);
-    }
-
-    const flowRun = await this.db.insert(flowRuns).values({
-      id: runId,
-      flowId: id,
-      ccu,
-      threads,
-      duration
-    }).returning().get();
-
-    const nodes = steps.map((step) => ({
-      ...step.endpoints,
-      postProcessor: step.flow_steps.postProcessor,
-    }) as ActionNode);
+    const [nodes, flowRun] = await Promise.all([
+      this.getFlowNodes(id),
+      this.db.insert(flowRuns).values({
+        id: runId,
+        flowId: id,
+        ccu,
+        threads,
+        duration,
+        rampUpTime,
+      }).returning().get()
+    ]);
 
     try {
       const workerPromises: Promise<void>[] = [];
-      const base = Math.floor(ccu / threads);
-      const remainder = ccu % threads;
 
       for (let i = 1; i <= threads; i++) {
-        const assignedCCU = base + (i <= remainder ? 1 : 0);
         const workerData = {
-          workerId: i,
           runId: flowRun.id,
-          ccu: assignedCCU,
+          ccu: this.distributeCCU(ccu, threads)[i - 1],
           rampUpTime,
           duration,
           nodes,
-          input
+          input,
+          credentials: this.distributeCredentials(input.credentials || [], threads)[i - 1] || []
         } as WorkerData;
 
         workerPromises.push(
@@ -224,7 +212,7 @@ export class FlowService {
             await this.db.insert(flowLogs).values(message.payload);
             this.gatewayService.emitLog(workerData.runId, message.payload);
           } catch (error) {
-            console.error(`[Worker ${workerData.workerId}] Error inserting log:`, error);
+            console.error(`[Worker] Error inserting log:`, error);
           }
         } else if (message.type === "done") {
           console.log(`[Worker ${message.payload.workerId}] ${message.payload.message}`);
@@ -238,16 +226,55 @@ export class FlowService {
       });
 
       worker.on("error", (error) => {
-        console.error(`[Worker ${workerData.workerId}] Worker error:`, error);
+        console.error(`[Worker] Worker error:`, error);
         reject(error);
       });
 
       worker.on("exit", (code) => {
         if (code !== 0) {
-          console.error(`[Worker ${workerData.workerId}] Worker stopped with exit code ${code}`);
+          console.error(`[Worker] Worker stopped with exit code ${code}`);
           reject(new Error(`Worker stopped with exit code ${code}`));
         }
       });
     });
+  }
+
+  private async getFlowNodes(id: string): Promise<ActionNode[]> {
+    const steps = await this.db.select().from(flowSteps)
+      .where(eq(flowSteps.flowId, id))
+      .leftJoin(endpoints, eq(flowSteps.endpointId, endpoints.id))
+      .orderBy(flowSteps.sequence);
+
+    if (steps.length === 0) {
+      throw new HttpException(`Flow ${id} does not have any steps`, 400);
+    }
+
+    return steps.map((step) => ({
+      ...step.endpoints,
+      postProcessor: step.flow_steps.postProcessor,
+    }) as ActionNode);
+  }
+
+  private distributeCCU(ccu: number, threads: number): number[] {
+    const base = Math.floor(ccu / threads);
+    const remainder = ccu % threads;
+    const distribution: number[] = Array(threads).fill(base);
+
+    for (let i = 0; i < remainder; i++) {
+      distribution[i]++;
+    }
+
+    return distribution;
+  }
+
+  private distributeCredentials(credentials: UserCredentials[], threads: number): UserCredentials[][] {
+    if (threads <= 0) return [];
+
+    const credentialsPerWorker: UserCredentials[][] = Array.from({ length: threads }, () => []);
+    credentials.forEach((cred, index) => {
+      credentialsPerWorker[index % threads].push(cred);
+    });
+
+    return credentialsPerWorker;
   }
 }

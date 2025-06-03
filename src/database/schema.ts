@@ -43,6 +43,7 @@ export const flowRuns = sqliteTable("flow_runs", {
   ccu: integer("ccu").notNull(),
   threads: integer("threads").notNull(),
   duration: integer("duration").notNull(),
+  rampUpTime: integer("ramp_up_time").notNull(),
   createdAt: text("created_at").$default(() => new Date().toISOString()).notNull(),
   updatedAt: text("updated_at").$default(() => new Date().toISOString()).notNull(),
 });

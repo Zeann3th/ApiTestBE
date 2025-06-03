@@ -1,7 +1,7 @@
 {
-  "name": "postman",
-  "version": "0.1.0",
-  "description": "An API load-testing tool",
+  "name": "loadtest-be",
+  "version": "1.0.0",
+  "description": "Backend for LoadTest, a load testing tool.",
   "author": "Zeann3th",
   "private": true,
   "license": "MIT",

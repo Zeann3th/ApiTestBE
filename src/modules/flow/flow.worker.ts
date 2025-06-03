@@ -1,11 +1,13 @@
 import { parentPort, workerData } from "worker_threads";
 import { RunnerService } from "../runner/runner.service";
+import { CredentialService } from "./credential.service";
 
 // Khởi tạo
-const { ccu, workerId, duration, rampUpTime, nodes, input, runId } = workerData;
+const { ccu, duration, rampUpTime, nodes, input, runId, credentials } = workerData;
 
 const startTime = Date.now();
 const endTime = startTime + duration * 1000;
+const credentialsManager = new CredentialService(credentials || []);
 const abortController = new AbortController();
 let stopped = false;
 let activeUsers = 0;
@@ -41,7 +43,7 @@ const startProgressReporting = () => {
         parentPort?.postMessage({
             type: "info",
             payload: {
-                message: `[Worker ${workerId}] Progress: ${activeUsers} active users, ${timeRemaining}s remaining, ${totalRequests} requests, ${totalErrors} errors`
+                message: `[Worker] Progress: ${activeUsers} active users, ${timeRemaining}s remaining, ${totalRequests} requests, ${totalErrors} errors`
             }
         });
     }, 10000);
@@ -56,8 +58,9 @@ const spawnUser = async (): Promise<void> => {
     activeUsers++;
     // Mỗi người dùng ảo sẽ có runner riêng để tránh xung đột cookies và trạng thái
     const runner = new RunnerService();
-
+    const credentials = credentialsManager.acquire();
     let data = JSON.parse(JSON.stringify(input));
+    data = { ...credentials, ...data };
 
     try {
         while (!stopped && Date.now() < endTime) {
@@ -119,10 +122,11 @@ const spawnUser = async (): Promise<void> => {
     } catch (err: any) {
         parentPort?.postMessage({
             type: "info",
-            payload: { message: `[Worker ${workerId}] User session ended: ${err.message}` }
+            payload: { message: `[Worker] User session ended: ${err.message}` }
         });
     } finally {
         activeUsers--;
+        if (credentials) credentialsManager.release(credentials);
     }
 }
 
@@ -132,7 +136,7 @@ const spawnUser = async (): Promise<void> => {
 const run = async (): Promise<void> => {
     parentPort?.postMessage({
         type: "info",
-        payload: { message: `[Worker ${workerId}] Starting ${ccu} concurrent users for ${duration}s` }
+        payload: { message: `[Worker] Starting ${ccu} concurrent users for ${duration}s` }
     });
 
     const progressInterval = startProgressReporting();
@@ -148,7 +152,7 @@ const run = async (): Promise<void> => {
                 .catch((err: any) => {
                     parentPort?.postMessage({
                         type: "info",
-                        payload: { message: `[Worker ${workerId}] User ${i + 1} failed: ${err.message}` }
+                        payload: { message: `[Worker] User ${i + 1} failed: ${err.message}` }
                     });
                 })
         );
@@ -159,7 +163,7 @@ const run = async (): Promise<void> => {
             stopped = true;
             parentPort?.postMessage({
                 type: "info",
-                payload: { message: `[Worker ${workerId}] Duration timeout reached (${duration}s). Stopping users...` }
+                payload: { message: `[Worker] Duration timeout reached (${duration}s). Stopping users...` }
             });
             resolve();
         }, duration * 1000);
@@ -169,7 +173,7 @@ const run = async (): Promise<void> => {
 
     parentPort?.postMessage({
         type: "info",
-        payload: { message: `[Worker ${workerId}] Timeout reached. Aborting all requests and cleaning up...` }
+        payload: { message: `[Worker] Timeout reached. Aborting all requests and cleaning up...` }
     });
 
     abortController.abort();
@@ -183,8 +187,7 @@ const run = async (): Promise<void> => {
     parentPort?.postMessage({
         type: "done",
         payload: {
-            message: `[Worker ${workerId}] Completed. Total requests: ${totalRequests}, Errors: ${totalErrors}`,
-            workerId,
+            message: `[Worker] Completed. Total requests: ${totalRequests}, Errors: ${totalErrors}`,
             totalRequests,
             totalErrors
         }
@@ -200,7 +203,7 @@ run()
     .catch((err: any) => {
         parentPort?.postMessage({
             type: "info",
-            payload: { message: `[Worker ${workerId}] Worker crashed: ${err.message}` }
+            payload: { message: `[Worker] Worker crashed: ${err.message}` }
         });
         process.exit(1);
     });

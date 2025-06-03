@@ -1,5 +1,6 @@
 import { ApiProperty } from "@nestjs/swagger";
 import { IsInt, IsNotEmpty, IsOptional, Max, Min } from "class-validator";
+import { UserCredentials } from "src/common/types";
 
 export class RunFlowDto {
     @ApiProperty({ type: "integer", description: "Concurrent Users", example: 2000 })
@@ -10,7 +11,7 @@ export class RunFlowDto {
 
     @ApiProperty({ type: "integer", description: "Threads", example: 4 })
     @Min(1)
-    @Max(4)
+    @Max(6)
     @IsInt()
     @IsNotEmpty()
     threads: number;
@@ -27,7 +28,7 @@ export class RunFlowDto {
     @IsNotEmpty()
     rampUpTime: number;
 
-    @ApiProperty({ description: "Additional input for flow", example: { "baseUrl": "http:/localhost:7554" } })
+    @ApiProperty({ description: "Additional input for flow", example: { "baseUrl": "http:/localhost:7554" }, required: false })
     @IsOptional()
-    input: Record<string, any>;
+    input: Record<string, any> & { credentials?: UserCredentials[] };
 }
