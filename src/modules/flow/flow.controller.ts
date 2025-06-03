@@ -38,7 +38,7 @@ export class FlowController {
 
   @ApiOperation({ summary: 'Run Flow' })
   @ApiParam({ name: 'id', required: true, type: String })
-  @ApiBody({ description: "ccu, threads and duration of a flow run", type: RunFlowDto })
+  @ApiBody({ description: "Flow Run configurations", type: RunFlowDto })
   @Post(':id/run')
   @HttpCode(202)
   async run(@Param('id') id: string, @Body() body: RunFlowDto) {

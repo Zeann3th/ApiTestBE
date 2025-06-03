@@ -22,14 +22,16 @@ export interface ActionNode extends Endpoint {
     postProcessor?: PostProcessor;
 }
 
+export interface UserCredentials extends Record<string, any> { }
+
 export interface WorkerData {
     ccu: number;
-    workerId: number;
     runId: string;
     duration: number;
     rampUpTime: number;
     nodes: ActionNode[];
     input: Record<string, any>;
+    credentials?: UserCredentials[];
 }
 
 export type WorkerMessage =

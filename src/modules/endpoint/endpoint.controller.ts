@@ -1,9 +1,9 @@
-import { Body, Controller, DefaultValuePipe, Delete, Get, HttpCode, Param, Patch, Post, Query, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, DefaultValuePipe, Delete, Get, HttpCode, Param, Post, Query, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { EndpointService } from './endpoint.service';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBody, ApiConsumes, ApiOperation, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { UploadEndpointsDTO } from './dto/upload-endpoints.dto';
-import { FileValidationPipe } from './pipe';
+import { FileValidationPipe } from '../../common/pipes';
 
 @Controller('endpoints')
 export class EndpointController {

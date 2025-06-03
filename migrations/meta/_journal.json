@@ -8,6 +8,13 @@
       "when": 1747918455901,
       "tag": "0000_jazzy_captain_cross",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1748922727078,
+      "tag": "0001_fast_ultimatum",
+      "breakpoints": true
     }
   ]
 }
