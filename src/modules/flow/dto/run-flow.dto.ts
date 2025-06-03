@@ -30,5 +30,9 @@ export class RunFlowDto {
 
     @ApiProperty({ description: "Additional input for flow", example: { "baseUrl": "http:/localhost:7554" }, required: false })
     @IsOptional()
-    input: Record<string, any> & { credentials?: UserCredentials[] };
+    input: Record<string, any>;
+
+    @ApiProperty({ description: "User credentials for authentication", required: false, example: [{ username: "Rufus", password: "Not-Rufus" }] })
+    @IsOptional()
+    credentials: UserCredentials[];
 }

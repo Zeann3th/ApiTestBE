@@ -156,7 +156,7 @@ export class FlowService {
     return { message: "Flow updated successfully" };
   }
 
-  async run(id: string, runId: string, { ccu, threads, duration, input, rampUpTime }: RunFlowDto) {
+  async run(id: string, runId: string, { ccu, threads, duration, input, rampUpTime, credentials }: RunFlowDto) {
     await this.getById(id);
 
     const [nodes, flowRun] = await Promise.all([
@@ -182,7 +182,7 @@ export class FlowService {
           duration,
           nodes,
           input,
-          credentials: this.distributeCredentials(input.credentials || [], threads)[i - 1] || []
+          credentials: this.distributeCredentials(credentials || [], threads)[i - 1] || []
         } as WorkerData;
 
         workerPromises.push(

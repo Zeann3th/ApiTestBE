@@ -7,7 +7,7 @@ const { ccu, duration, rampUpTime, nodes, input, runId, credentials } = workerDa
 
 const startTime = Date.now();
 const endTime = startTime + duration * 1000;
-const credentialsManager = new CredentialService(credentials || []);
+const credentialsManager = new CredentialService(credentials || [], ccu);
 const abortController = new AbortController();
 let stopped = false;
 let activeUsers = 0;

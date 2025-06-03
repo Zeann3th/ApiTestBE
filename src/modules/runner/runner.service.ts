@@ -43,6 +43,8 @@ export class RunnerService {
   async run(node: ActionNode, data: Record<string, any> = {}, abortSignal?: AbortSignal): Promise<{ data: Record<string, any>, response: any }> {
     if (!node) throw new Error('Endpoint is not defined');
 
+    console.log(data);
+
     const request = this.interpolate(node, data);
 
     const response = await this.axiosInstance({
@@ -81,8 +83,27 @@ export class RunnerService {
   }
 
   private resolvePath(obj: any, path: string): any {
-    const parts = path.replace(/\[(\w+)\]/g, '.$1').split('.');
-    return parts.reduce((acc, key) => (acc != null ? acc[key] : undefined), obj);
+    const parts = path.replace(/\[(\w+|\*)\]/g, '.$1').split('.');
+
+    let current = obj;
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i];
+
+      if (part === '*') {
+        if (Array.isArray(current)) {
+          const randomIndex = Math.floor(Math.random() * current.length);
+          current = current[randomIndex];
+        } else {
+          return undefined;
+        }
+      } else {
+        current = current?.[part];
+      }
+
+      if (current === undefined) break;
+    }
+
+    return current;
   }
 
   private interpolate(template: Endpoint, data: Record<string, any>): Endpoint {
