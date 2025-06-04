@@ -43,8 +43,6 @@ export class RunnerService {
   async run(node: ActionNode, data: Record<string, any> = {}, abortSignal?: AbortSignal): Promise<{ data: Record<string, any>, response: any }> {
     if (!node) throw new Error('Endpoint is not defined');
 
-    console.log(data);
-
     const request = this.interpolate(node, data);
 
     const response = await this.axiosInstance({
