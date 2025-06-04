@@ -142,4 +142,9 @@ export class FlowRunService {
 
         return await this.reportService.generateReport(reportData);
     }
+
+    async deleteAll() {
+        await this.db.delete(flowRuns);
+        return {};
+    }
 }

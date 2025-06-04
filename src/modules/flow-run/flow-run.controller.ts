@@ -1,4 +1,4 @@
-import { Controller, DefaultValuePipe, Get, Header, Param, Query, Res } from '@nestjs/common';
+import { Controller, DefaultValuePipe, Delete, Get, Header, HttpCode, Param, Query, Res } from '@nestjs/common';
 import { FlowRunService } from './flow-run.service';
 import { ApiOperation, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { Response } from 'express';
@@ -37,5 +37,12 @@ export class FlowRunController {
             'Content-Length': pdfBuffer.length.toString(),
         });
         res.end(pdfBuffer);
+    }
+
+    @ApiOperation({ summary: 'Delete all flow runs' })
+    @Delete()
+    @HttpCode(204)
+    async deleteAll() {
+        return await this.flowRunService.deleteAll();
     }
 }
