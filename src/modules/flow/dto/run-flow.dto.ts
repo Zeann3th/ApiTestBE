@@ -32,7 +32,7 @@ export class RunFlowDto {
     @IsOptional()
     input: Record<string, any>;
 
-    @ApiProperty({ description: "User credentials for authentication", required: false, example: [{ username: "Rufus", password: "Not-Rufus" }] })
+    @ApiProperty({ description: "User credentials for authentication", required: false, example: [{ username: "Rufus", password: "Not-Rufus" }], maxItems: 3000 })
     @IsOptional()
     credentials: UserCredentials[];
 }

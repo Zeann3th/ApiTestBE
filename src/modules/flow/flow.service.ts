@@ -271,9 +271,20 @@ export class FlowService {
     if (threads <= 0) return [];
 
     const credentialsPerWorker: UserCredentials[][] = Array.from({ length: threads }, () => []);
-    credentials.forEach((cred, index) => {
-      credentialsPerWorker[index % threads].push(cred);
-    });
+
+    if (credentials.length === 0) {
+      return credentialsPerWorker;
+    }
+
+    if (credentials.length < threads) {
+      credentialsPerWorker.forEach(workerCreds => {
+        workerCreds.push(...credentials);
+      });
+    } else {
+      credentials.forEach((cred, index) => {
+        credentialsPerWorker[index % threads].push(cred);
+      });
+    }
 
     return credentialsPerWorker;
   }
