@@ -7,9 +7,9 @@ const schema = z.object({
   NODE_ENV: z.enum(["production", "development"]).default("development"),
   DATABASE_URL: z.string()
     .startsWith("file:", "Try adding 'file:' to resolve")
-    .default(`file:${os.homedir()}/loadtest/data/local.db`),
+    .default(`file:${os.homedir()}/StressPilot/data/local.db`),
   APP_URL: z.string().default("http://localhost:1420"),
-  APP_NAME: z.string({ required_error: "APP_NAME is required" }).default("LoadTest"),
+  APP_NAME: z.string({ required_error: "APP_NAME is required" }).default("StressPilot"),
 });
 
 export type Env = z.infer<typeof schema>;

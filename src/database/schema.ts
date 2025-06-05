@@ -1,5 +1,14 @@
 import { index, integer, real, sqliteTable, text, unique } from "drizzle-orm/sqlite-core";
 
+export const projects = sqliteTable("projects", {
+  id: text("id").primaryKey().$default(() => crypto.randomUUID()),
+  name: text("name").notNull(),
+  createdAt: text("created_at").$default(() => new Date().toISOString()).notNull(),
+  updatedAt: text("updated_at").$default(() => new Date().toISOString()).notNull(),
+}, (table) => [
+  unique("projects_name_idx").on(table.name),
+]);
+
 export const endpoints = sqliteTable("endpoints", {
   id: text("id").primaryKey().$default(() => crypto.randomUUID()),
   name: text("name").notNull(),
@@ -9,10 +18,11 @@ export const endpoints = sqliteTable("endpoints", {
   headers: text("headers", { mode: "json" }),
   body: text("body", { mode: "json" }),
   parameters: text("parameters", { mode: "json" }),
+  projectId: text("project_id").references(() => projects.id, { onDelete: "cascade" }).notNull(),
   createdAt: text("created_at").$default(() => new Date().toISOString()).notNull(),
   updatedAt: text("updated_at").$default(() => new Date().toISOString()).notNull(),
 }, (table) => [
-  unique("endpoints_path_idx").on(table.method, table.url),
+  unique("endpoints_path_idx").on(table.projectId, table.method, table.url),
   index("endpoints_name_idx").on(table.name)
 ]);
 

@@ -44,12 +44,12 @@ export class EndpointController {
 
   @ApiOperation({ summary: 'Upload api endpoints\' file' })
   @ApiConsumes('multipart/form-data')
-  @ApiBody({ description: 'File to upload', type: UploadEndpointsDTO })
+  @ApiBody({ description: 'File and project name', type: UploadEndpointsDTO })
   @HttpCode(200)
   @Post('upload')
   @UseInterceptors(FileInterceptor('file'))
-  async upload(@UploadedFile(new FileValidationPipe()) file: Express.Multer.File) {
-    return await this.endpointService.upload(file);
+  async upload(@UploadedFile(new FileValidationPipe()) file: Express.Multer.File, @Body('projectName') projectName: string) {
+    return await this.endpointService.upload(file, projectName);
   }
 
   @ApiOperation({ summary: 'Delete endpoint by id' })
