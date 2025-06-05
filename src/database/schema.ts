@@ -12,7 +12,7 @@ export const endpoints = sqliteTable("endpoints", {
   createdAt: text("created_at").$default(() => new Date().toISOString()).notNull(),
   updatedAt: text("updated_at").$default(() => new Date().toISOString()).notNull(),
 }, (table) => [
-  unique("endpoints_path_idx").on(table.method, table.url),
+  unique("endpoints_path_idx").on(table.name, table.method, table.url),
   index("endpoints_name_idx").on(table.name)
 ]);
 

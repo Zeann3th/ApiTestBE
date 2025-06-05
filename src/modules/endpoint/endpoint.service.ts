@@ -42,13 +42,16 @@ export class EndpointService {
     return endpoint;
   }
 
-  async upload(file: Express.Multer.File) {
+  async upload(file: Express.Multer.File, projectName: string) {
     try {
       const data = this.parserService.createParser(file.mimetype).parse(file.buffer.toString());
+      data.forEach((item: Endpoint) => {
+        item.name = `${projectName}/${item.name}`;
+      });
       const req = await this.db.insert(endpoints).values(data).onConflictDoUpdate({
-        target: [endpoints.method, endpoints.url],
+        target: [endpoints.name, endpoints.method, endpoints.url],
         set: {
-          name: sql`excluded.name`,
+          name: `${projectName}` + sql`excluded.name`,
           description: sql`excluded.description`,
           method: sql`excluded.method`,
           url: sql`excluded.url`,

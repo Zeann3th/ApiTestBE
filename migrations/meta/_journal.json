@@ -15,6 +15,13 @@
       "when": 1748922727078,
       "tag": "0001_fast_ultimatum",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1749126822738,
+      "tag": "0002_nosy_boomer",
+      "breakpoints": true
     }
   ]
 }
