@@ -7,12 +7,14 @@ CREATE TABLE `endpoints` (
 	`headers` text,
 	`body` text,
 	`parameters` text,
+	`project_id` text NOT NULL,
 	`created_at` text NOT NULL,
-	`updated_at` text NOT NULL
+	`updated_at` text NOT NULL,
+	FOREIGN KEY (`project_id`) REFERENCES `projects`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
 CREATE INDEX `endpoints_name_idx` ON `endpoints` (`name`);--> statement-breakpoint
-CREATE UNIQUE INDEX `endpoints_path_idx` ON `endpoints` (`method`,`url`);--> statement-breakpoint
+CREATE UNIQUE INDEX `endpoints_path_idx` ON `endpoints` (`project_id`,`method`,`url`);--> statement-breakpoint
 CREATE TABLE `flow_logs` (
 	`id` text PRIMARY KEY NOT NULL,
 	`run_id` text NOT NULL,
@@ -29,9 +31,10 @@ CREATE TABLE `flow_runs` (
 	`id` text PRIMARY KEY NOT NULL,
 	`flow_id` text NOT NULL,
 	`status` text NOT NULL,
-	`ccu` integer,
-	`threads` integer,
-	`duration` integer,
+	`ccu` integer NOT NULL,
+	`threads` integer NOT NULL,
+	`duration` integer NOT NULL,
+	`ramp_up_time` integer NOT NULL,
 	`created_at` text NOT NULL,
 	`updated_at` text NOT NULL,
 	FOREIGN KEY (`flow_id`) REFERENCES `flows`(`id`) ON UPDATE no action ON DELETE cascade
@@ -57,3 +60,12 @@ CREATE TABLE `flows` (
 	`created_at` text NOT NULL,
 	`updated_at` text NOT NULL
 );
+--> statement-breakpoint
+CREATE TABLE `projects` (
+	`id` text PRIMARY KEY NOT NULL,
+	`name` text NOT NULL,
+	`created_at` text NOT NULL,
+	`updated_at` text NOT NULL
+);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `projects_name_idx` ON `projects` (`name`);

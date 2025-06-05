@@ -1,7 +1,7 @@
 import { HttpException, Inject, Injectable } from '@nestjs/common';
 import { count, eq, like, sql } from 'drizzle-orm';
 import { DRIZZLE } from 'src/database/drizzle.module';
-import { endpoints } from 'src/database/schema';
+import { endpoints, projects } from 'src/database/schema';
 import { DrizzleDB } from 'src/common/types/drizzle';
 import { ParserService } from '../parser/parser.service';
 import { RunnerService } from '../runner/runner.service';
@@ -18,47 +18,92 @@ export class EndpointService {
   async getAll(page: number, limit: number) {
     const [[{ total }], endpointList] = await Promise.all([
       this.db.select({ total: count() }).from(endpoints),
-      this.db.select().from(endpoints)
+      this.db
+        .select({
+          endpoints,
+          projectName: projects.name
+        })
+        .from(endpoints)
+        .leftJoin(projects, eq(endpoints.projectId, projects.id))
         .limit(limit)
         .offset((page - 1) * limit)
     ]);
 
+    const data = endpointList.map(({ endpoints, projectName }) => {
+      const { projectId, ...rest } = endpoints;
+      return {
+        ...rest,
+        name: `${projectName}/${rest.name}`,
+      }
+    });
+
     return {
       total,
-      data: endpointList
-    }
+      data
+    };
   }
 
   async getById(id: string) {
-    const [endpoint] = await this.db
-      .select()
+    const [result] = await this.db
+      .select({
+        endpoints,
+        projectName: projects.name
+      })
       .from(endpoints)
+      .leftJoin(projects, eq(endpoints.projectId, projects.id))
       .where(eq(endpoints.id, id));
 
-    if (!endpoint) {
+    if (!result) {
       throw new HttpException('Endpoint not found', 404);
     }
 
-    return endpoint;
+    const { endpoints: endpoint, projectName } = result;
+    const { projectId, ...rest } = endpoint;
+
+    return {
+      ...rest,
+      name: `${projectName}/${rest.name}`,
+    };
   }
 
   async upload(file: Express.Multer.File, projectName: string) {
     try {
       const data = this.parserService.createParser(file.mimetype).parse(file.buffer.toString());
-      data.forEach((item: Endpoint) => {
-        item.name = `${projectName}/${item.name}`;
-      });
-      const req = await this.db.insert(endpoints).values(data).onConflictDoUpdate({
-        target: [endpoints.name, endpoints.method, endpoints.url],
+
+      let project = await this.db.select({ id: projects.id })
+        .from(projects)
+        .where(eq(projects.name, projectName));
+
+      let projectId = project[0]?.id;
+
+      if (!projectId) {
+        const inserted = await this.db.insert(projects).values({
+          name: projectName,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        }).returning({ id: projects.id });
+        projectId = inserted[0].id;
+      }
+
+      const endpointsWithProjectId = data.map((endpoint) => ({
+        ...endpoint,
+        projectId
+      }));
+
+      const updatedAt = new Date().toISOString();
+
+      const req = await this.db.insert(endpoints).values(endpointsWithProjectId).onConflictDoUpdate({
+        target: [endpoints.projectId, endpoints.method, endpoints.url],
         set: {
-          name: `${projectName}` + sql`excluded.name`,
+          name: sql`excluded.name`,
           description: sql`excluded.description`,
           method: sql`excluded.method`,
           url: sql`excluded.url`,
           headers: sql`excluded.headers`,
           body: sql`excluded.body`,
           parameters: sql`excluded.parameters`,
-          updatedAt: new Date().toISOString()
+          projectId,
+          updatedAt
         }
       });
       return { message: `${req.rowsAffected} endpoints upserted` };
