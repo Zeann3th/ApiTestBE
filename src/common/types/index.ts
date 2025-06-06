@@ -14,10 +14,12 @@ export class PostProcessor {
         min: number;
         max: number;
     };
+    alias?: Record<string, string>;
 }
 
 export class PreProcessor {
     inject?: Record<string, any>;
+    alias?: Record<string, string>;
 }
 
 export class Processor {

@@ -51,6 +51,14 @@ export class RunnerService {
       if (preProcessor.inject) {
         data = { ...data, ...preProcessor.inject };
       }
+
+      if (preProcessor.alias) {
+        for (const [key, alias] of Object.entries(preProcessor.alias)) {
+          if (data[key] !== undefined) {
+            data[key] = data[alias];
+          }
+        }
+      }
     }
 
     const request = this.interpolate(node, data);
@@ -82,6 +90,14 @@ export class RunnerService {
         const { min, max } = postProcessor.delay;
         const randomMs = min + Math.floor(Math.random() * (max - min + 1));
         await new Promise(resolve => setTimeout(resolve, randomMs));
+      }
+
+      if (postProcessor.alias) {
+        for (const [key, alias] of Object.entries(postProcessor.alias)) {
+          if (data[key] !== undefined) {
+            data[key] = data[alias];
+          }
+        }
       }
     }
 
