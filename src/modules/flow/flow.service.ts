@@ -9,8 +9,9 @@ import { RunFlowDto } from './dto/run-flow.dto';
 import { Worker } from 'worker_threads';
 import { FlowProcessorDto } from './dto/flow-processor.dto';
 import path from 'path';
-import { ActionNode, UserCredentials, WorkerData, WorkerMessage } from 'src/common/types';
+import { ActionNode, WorkerData, WorkerMessage } from 'src/common/types';
 import { GatewayService } from '../gateway/gateway.service';
+import { CredentialService } from './credential.service';
 
 @Injectable()
 export class FlowService {
@@ -172,17 +173,22 @@ export class FlowService {
     ]);
 
     try {
+      const sharedCredentialService = new CredentialService(credentials || [], ccu);
+      const sharedBuffer = sharedCredentialService.getSharedBuffer();
+
       const workerPromises: Promise<void>[] = [];
+      const ccuDistribution = this.distributeCCU(ccu, threads);
 
       for (let i = 1; i <= threads; i++) {
         const workerData = {
           runId: flowRun.id,
-          ccu: this.distributeCCU(ccu, threads)[i - 1],
+          ccu: ccuDistribution[i - 1],
           rampUpTime,
           duration,
           nodes,
           input,
-          credentials: this.distributeCredentials(credentials || [], threads)[i - 1] || []
+          sharedCredentialBuffer: sharedBuffer,
+          totalCcu: ccu
         } as WorkerData;
 
         workerPromises.push(
@@ -215,7 +221,7 @@ export class FlowService {
             console.error(`[Worker] Error inserting log:`, error);
           }
         } else if (message.type === "done") {
-          console.log(`[Worker ${message.payload.workerId}] ${message.payload.message}`);
+          console.log(`${message.payload.message}`);
           this.gatewayService.emitDone(workerData.runId, message.payload.message);
           resolve();
         } else if (message.type === "info") {
@@ -265,27 +271,5 @@ export class FlowService {
     }
 
     return distribution;
-  }
-
-  private distributeCredentials(credentials: UserCredentials[], threads: number): UserCredentials[][] {
-    if (threads <= 0) return [];
-
-    const credentialsPerWorker: UserCredentials[][] = Array.from({ length: threads }, () => []);
-
-    if (credentials.length === 0) {
-      return credentialsPerWorker;
-    }
-
-    if (credentials.length < threads) {
-      credentialsPerWorker.forEach(workerCreds => {
-        workerCreds.push(...credentials);
-      });
-    } else {
-      credentials.forEach((cred, index) => {
-        credentialsPerWorker[index % threads].push(cred);
-      });
-    }
-
-    return credentialsPerWorker;
   }
 }

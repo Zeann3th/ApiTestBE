@@ -2,35 +2,22 @@ import { parentPort, workerData } from "worker_threads";
 import { RunnerService } from "../runner/runner.service";
 import { CredentialService } from "./credential.service";
 
-// Khởi tạo
-const { ccu, duration, rampUpTime, nodes, input, runId, credentials } = workerData;
+const { ccu, duration, rampUpTime, nodes, input, runId, sharedCredentialBuffer, totalCcu } = workerData;
 
 const startTime = Date.now();
 const endTime = startTime + duration * 1000;
-const credentialsManager = new CredentialService(credentials || [], ccu);
+const credentialsManager = new CredentialService([], totalCcu, sharedCredentialBuffer);
 const abortController = new AbortController();
 let stopped = false;
 let activeUsers = 0;
 let totalRequests = 0;
 let totalErrors = 0;
 
-/**
- * Hàm tạo độ trễ cơ bản
- * @param ms Thời gian trễ (ms)
- */
 const delay = (ms: number) => new Promise((res) => setTimeout(res, ms));
 
-/**
- * Hàm tạo độ trễ ngẫu nhiên
- * @param base Thời gian cơ bản (ms)
- * @param variance Biến thể (ms) để tạo độ trễ ngẫu nhiên
- */
 const randomDelay = async (base: number, variance: number) =>
     await delay(base + Math.floor(Math.random() * variance));
 
-/**
- * Thông báo tiến độ, thông tin về hoạt động của worker
- */
 const startProgressReporting = () => {
     const progressInterval = setInterval(() => {
         if (stopped) {
@@ -51,12 +38,8 @@ const startProgressReporting = () => {
     return progressInterval;
 };
 
-/**
- * Mô phỏng người dùng
- */
 const spawnUser = async (): Promise<void> => {
     activeUsers++;
-    // Mỗi người dùng ảo sẽ có runner riêng để tránh xung đột cookies và trạng thái
     const runner = new RunnerService();
     const credentials = credentialsManager.acquire();
     let data = JSON.parse(JSON.stringify(input));
@@ -126,13 +109,9 @@ const spawnUser = async (): Promise<void> => {
         });
     } finally {
         activeUsers--;
-        if (credentials) credentialsManager.release(credentials);
     }
 }
 
-/**
- * Luồng họat động chính
- */
 const run = async (): Promise<void> => {
     parentPort?.postMessage({
         type: "info",
@@ -143,7 +122,6 @@ const run = async (): Promise<void> => {
 
     const users: Promise<void>[] = [];
 
-    // Tạo người dùng với độ trễ ramp-up, tránh overload server
     for (let i = 0; i < ccu; i++) {
         const delayTime = Math.floor((i / ccu) * rampUpTime * 1000);
         users.push(

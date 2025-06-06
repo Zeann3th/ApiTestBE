@@ -44,14 +44,16 @@ export class PostmanParser implements ApiSpecParser {
         }
 
         const parameters = this.extractKeyValuePairs(request.url.query);
-        if (Object.keys(parameters).length > 0) {
-            endpoint.parameters = parameters;
+        const templatedParameters = this.convertValuesToTemplate(parameters);
+        if (Object.keys(templatedParameters).length > 0) {
+            endpoint.parameters = templatedParameters;
         }
 
         if (request.body?.mode === 'raw') {
             const body = this.safeJsonParse(request.body.raw);
-            if (Object.keys(body).length > 0) {
-                endpoint.body = body;
+            const templatedBody = this.convertValuesToTemplate(body);
+            if (Object.keys(templatedBody).length > 0) {
+                endpoint.body = templatedBody;
             }
         }
 
@@ -75,5 +77,21 @@ export class PostmanParser implements ApiSpecParser {
         } catch {
             return {};
         }
+    }
+
+    private convertValuesToTemplate(obj: Record<string, any>): Record<string, any> {
+        const result: Record<string, any> = {};
+
+        for (const [key, value] of Object.entries(obj)) {
+            if (typeof value === 'string' || typeof value === 'number') {
+                result[key] = `{{${key}}}`;
+            } else if (typeof value === 'object' && value !== null) {
+                result[key] = this.convertValuesToTemplate(value);
+            } else {
+                result[key] = value;
+            }
+        }
+
+        return result;
     }
 }
