@@ -57,7 +57,7 @@ export class FlowController {
 
   @ApiOperation({ summary: 'Update Flow Processor' })
   @ApiParam({ name: 'id', required: true, type: String })
-  @ApiBody({ description: "postProcessor of a flow", type: FlowProcessorDto })
+  @ApiBody({ description: "processor of a flow", type: FlowProcessorDto })
   @Patch(':id/processor')
   async updateProcessor(
     @Param('id') id: string,

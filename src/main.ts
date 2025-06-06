@@ -62,7 +62,7 @@ async function bootstrap() {
 
 
   await app.listen(env.PORT, () => {
-    logger.log(`🚀 Postman BE 0.0.1 on http://localhost:${env.PORT}`);
+    logger.log(`🚀 StressPilot BE 1.0.0 on http://localhost:${env.PORT}`);
   });
 }
 
