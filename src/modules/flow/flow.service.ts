@@ -101,7 +101,7 @@ export class FlowService {
             .from(flowSteps)
             .where(eq(flowSteps.flowId, id));
 
-          const postProcessorMap = new Map(
+          const processorMap = new Map(
             existingSteps.map(step => [step.endpointId, step.processor])
           );
 
@@ -112,7 +112,7 @@ export class FlowService {
             flowId: id,
             endpointId,
             sequence: index + 1,
-            postProcessor: postProcessorMap.get(endpointId) || null
+            postProcessor: processorMap.get(endpointId) || null
           }));
 
           await tx.insert(flowSteps).values(flowStepValues);
@@ -257,7 +257,7 @@ export class FlowService {
 
     return steps.map((step) => ({
       ...step.endpoints,
-      postProcessor: step.flow_steps.processor,
+      processor: step.flow_steps.processor,
     }) as ActionNode);
   }
 
