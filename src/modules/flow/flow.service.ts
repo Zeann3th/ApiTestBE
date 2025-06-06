@@ -48,7 +48,7 @@ export class FlowService {
       .orderBy(asc(flowSteps.sequence));
 
     const endpointList = steps.map(({ flow_steps, endpoints }) => {
-      return { ...endpoints, postProcessor: flow_steps.postProcessor };
+      return { ...endpoints, processor: flow_steps.processor };
     })
 
     return { ...flow, sequence: endpointList };
@@ -95,14 +95,14 @@ export class FlowService {
         if (sequence) {
           const existingSteps = await tx.select({
             endpointId: flowSteps.endpointId,
-            postProcessor: flowSteps.postProcessor,
+            processor: flowSteps.processor,
             sequence: flowSteps.sequence
           })
             .from(flowSteps)
             .where(eq(flowSteps.flowId, id));
 
           const postProcessorMap = new Map(
-            existingSteps.map(step => [step.endpointId, step.postProcessor])
+            existingSteps.map(step => [step.endpointId, step.processor])
           );
 
           await tx.delete(flowSteps)
@@ -133,7 +133,7 @@ export class FlowService {
     return {};
   }
 
-  async updateProcessor(id: string, { sequence, postProcessor }: FlowProcessorDto) {
+  async updateProcessor(id: string, { sequence, processor }: FlowProcessorDto) {
     await this.getById(id);
 
     const [step] = await this.db.select()
@@ -148,7 +148,7 @@ export class FlowService {
     }
 
     await this.db.update(flowSteps)
-      .set({ postProcessor })
+      .set({ processor })
       .where(and(
         eq(flowSteps.flowId, id),
         eq(flowSteps.sequence, sequence)
@@ -257,7 +257,7 @@ export class FlowService {
 
     return steps.map((step) => ({
       ...step.endpoints,
-      postProcessor: step.flow_steps.postProcessor,
+      postProcessor: step.flow_steps.processor,
     }) as ActionNode);
   }
 

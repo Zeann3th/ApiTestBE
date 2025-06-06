@@ -14,12 +14,20 @@ export class PostProcessor {
         min: number;
         max: number;
     };
+}
+
+export class PreProcessor {
     inject?: Record<string, any>;
+}
+
+export class Processor {
+    pre?: PreProcessor;
+    post?: PostProcessor;
 }
 
 export interface ActionNode extends Endpoint {
     id: string;
-    postProcessor?: PostProcessor;
+    processor?: Processor;
 }
 
 export interface UserCredentials extends Record<string, any> { }

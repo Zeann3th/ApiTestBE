@@ -38,7 +38,7 @@ export const flowSteps = sqliteTable("flow_steps", {
   id: text("id").primaryKey().$default(() => crypto.randomUUID()),
   flowId: text("flow_id").references(() => flows.id, { onDelete: "cascade" }).notNull(),
   endpointId: text("endpoint_id").references(() => endpoints.id, { onDelete: "cascade" }).notNull(),
-  postProcessor: text("post_processor", { mode: "json" }),
+  processor: text("processor", { mode: "json" }),
   sequence: integer("sequence").notNull(),
   createdAt: text("created_at").$default(() => new Date().toISOString()).notNull(),
   updatedAt: text("updated_at").$default(() => new Date().toISOString()).notNull(),

@@ -1,0 +1,1 @@
+ALTER TABLE `flow_steps` RENAME COLUMN "post_processor" TO "processor";

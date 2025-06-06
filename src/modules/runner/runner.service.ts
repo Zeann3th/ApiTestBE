@@ -43,6 +43,16 @@ export class RunnerService {
   async run(node: ActionNode, data: Record<string, any> = {}, abortSignal?: AbortSignal): Promise<{ data: Record<string, any>, response: any }> {
     if (!node) throw new Error('Endpoint is not defined');
 
+    const processors = node.processor;
+    const preProcessor = processors?.pre;
+    const postProcessor = processors?.post;
+
+    if (preProcessor) {
+      if (preProcessor.inject) {
+        data = { ...data, ...preProcessor.inject };
+      }
+    }
+
     const request = this.interpolate(node, data);
 
     const response = await this.axiosInstance({
@@ -57,15 +67,10 @@ export class RunnerService {
       signal: abortSignal ?? AbortSignal.timeout(this.REQUEST_TIMEOUT),
     });
 
-    const postProcessors = node.postProcessor;
+    if (postProcessor) {
 
-    if (postProcessors) {
-      if (postProcessors.inject) {
-        data = { ...data, ...postProcessors.inject };
-      }
-
-      if (postProcessors?.extract) {
-        for (const [key, path] of Object.entries(postProcessors.extract)) {
+      if (postProcessor.extract) {
+        for (const [key, path] of Object.entries(postProcessor.extract)) {
           const value = this.resolvePath(response?.data, path);
           if (value !== undefined) {
             data[key] = value;
@@ -73,8 +78,8 @@ export class RunnerService {
         }
       }
 
-      if (postProcessors?.delay) {
-        const { min, max } = postProcessors.delay;
+      if (postProcessor.delay) {
+        const { min, max } = postProcessor.delay;
         const randomMs = min + Math.floor(Math.random() * (max - min + 1));
         await new Promise(resolve => setTimeout(resolve, randomMs));
       }
