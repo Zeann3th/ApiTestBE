@@ -60,6 +60,10 @@ export class RunnerService {
     const postProcessors = node.postProcessor;
 
     if (postProcessors) {
+      if (postProcessors.inject) {
+        data = { ...data, ...postProcessors.inject };
+      }
+
       if (postProcessors?.extract) {
         for (const [key, path] of Object.entries(postProcessors.extract)) {
           const value = this.resolvePath(response?.data, path);
