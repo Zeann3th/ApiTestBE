@@ -66,7 +66,7 @@
                         "method": "POST",
                         "body": {
                             "mode": "raw",
-                            "raw": "{\r\n    \"username\": \"Rufus\",\r\n    \"password\": \"Not-Rufus\"\r\n}",
+                            "raw": "{\r\n    \"username\": \"{{username}}\",\r\n    \"password\": \"{{password}}\"\r\n}",
                             "options": {
                                 "raw": {
                                     "language": "json"
@@ -555,13 +555,21 @@
                         "auth": {},
                         "method": "PATCH",
                         "body": {
-                            "mode": "raw",
-                            "raw": "{\r\n    \"name\": \"Ly Hien Long\"\r\n}",
-                            "options": {
-                                "raw": {
-                                    "language": "json"
+                            "mode": "formdata",
+                            "formdata": [
+                                {
+                                    "key": "file",
+                                    "type": "file"
+                                },
+                                {
+                                    "key": "name",
+                                    "type": "text"
+                                },
+                                {
+                                    "key": "avatar",
+                                    "type": "text"
                                 }
-                            }
+                            ]
                         },
                         "header": [
                             {
@@ -760,6 +768,50 @@
                                     "type": "string"
                                 }
                             ]
+                        }
+                    },
+                    "response": [],
+                    "protocolProfileBehavior": {
+                        "strictSSL": false,
+                        "followRedirects": true
+                    }
+                },
+                {
+                    "name": "Get User's Discussions",
+                    "description": "",
+                    "event": [],
+                    "auth": {},
+                    "request": {
+                        "auth": {},
+                        "method": "GET",
+                        "body": {},
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{access_token}}",
+                                "description": "",
+                                "type": "string"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/v1/users/discussions",
+                            "path": [
+                                "v1",
+                                "users",
+                                "discussions"
+                            ],
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "query": [
+                                {
+                                    "key": "problemId",
+                                    "value": "67f9ef27fa439590ee4e02fc",
+                                    "description": "",
+                                    "type": "string"
+                                }
+                            ],
+                            "variable": []
                         }
                     },
                     "response": [],
@@ -2253,7 +2305,20 @@
                                 }
                             }
                         },
-                        "header": [],
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{access_token}}",
+                                "description": "",
+                                "type": "string"
+                            },
+                            {
+                                "key": "x-csrf-token",
+                                "value": "{{csrf_token}}",
+                                "description": "",
+                                "type": "string"
+                            }
+                        ],
                         "url": {
                             "raw": "https://chat.leetbase.cloud/chat/ask",
                             "path": [
