@@ -54,7 +54,7 @@ export class RunnerService {
 
       if (preProcessor.alias) {
         for (const [key, alias] of Object.entries(preProcessor.alias)) {
-          if (data[key] !== undefined) {
+          if (data[alias] !== undefined) {
             data[key] = data[alias];
           }
         }
